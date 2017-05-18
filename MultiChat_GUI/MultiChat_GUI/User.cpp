@@ -8,6 +8,7 @@
 #define SERVERPORT 9000
 #define BUFSIZE    512
 
+#pragma region Function Declare
 // 대화상자 프로시저
 BOOL CALLBACK DlgProc(HWND, UINT, WPARAM, LPARAM);
 // 편집 컨트롤 출력 함수
@@ -19,12 +20,62 @@ void err_display(char *msg);
 int recvn(SOCKET s, char *buf, int len, int flags);
 // 소켓 통신 스레드 함수
 DWORD WINAPI ClientMain(LPVOID arg);
-
+#pragma endregion
+#pragma region Variable Declare
 SOCKET sock; // 소켓
 char buf[BUFSIZE + 1]; // 데이터 송수신 버퍼
 HANDLE hReadEvent, hWriteEvent; // 이벤트
 HWND hSendButton;    // 보내기 버튼
-HWND hEdit1, hEdit2; // 편집 컨트롤
+HWND hLoginButton;    // 접속 버튼
+HWND hExitButton;    // 접속 버튼
+HWND hEditIP, hEditPort, hEditText, hShowText; // 편집 컨트롤
+
+#pragma endregion
+											   // 소켓 함수 오류 출력 후 종료
+void err_quit(char *msg)
+{
+	LPVOID lpMsgBuf;
+	FormatMessage(
+		FORMAT_MESSAGE_ALLOCATE_BUFFER | FORMAT_MESSAGE_FROM_SYSTEM,
+		NULL, WSAGetLastError(),
+		MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT),
+		(LPTSTR)&lpMsgBuf, 0, NULL);
+	MessageBox(NULL, (LPCTSTR)lpMsgBuf, msg, MB_ICONERROR);
+	LocalFree(lpMsgBuf);
+	exit(1);
+}
+// 소켓 함수 오류 출력
+void err_display(char *msg)
+{
+	LPVOID lpMsgBuf;
+	FormatMessage(
+		FORMAT_MESSAGE_ALLOCATE_BUFFER | FORMAT_MESSAGE_FROM_SYSTEM,
+		NULL, WSAGetLastError(),
+		MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT),
+		(LPTSTR)&lpMsgBuf, 0, NULL);
+	DisplayText("[%s] %s", msg, (char *)lpMsgBuf);
+	LocalFree(lpMsgBuf);
+}
+// 사용자 정의 데이터 수신 함수
+int recvn(SOCKET s, char *buf, int len, int flags)
+{
+	int received;
+	char *ptr = buf;
+	int left = len;
+
+	while (left > 0) {
+		received = recv(s, ptr, left, flags);
+		if (received == SOCKET_ERROR)
+			return SOCKET_ERROR;
+		else if (received == 0)
+			break;
+		left -= received;
+		ptr += received;
+	}
+
+	return (len - left);
+}
+
 
 int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance,
 	LPSTR lpCmdLine, int nCmdShow)
@@ -58,20 +109,27 @@ BOOL CALLBACK DlgProc(HWND hDlg, UINT uMsg, WPARAM wParam, LPARAM lParam)
 {
 	switch (uMsg) {
 	case WM_INITDIALOG:
-		hEdit1 = GetDlgItem(hDlg, IDC_EDIT1);
-		hEdit2 = GetDlgItem(hDlg, IDC_EDIT3);
+		#pragma region Init Dialog
+
+		hEditIP = GetDlgItem(hDlg, EditIP);
+		hEditPort = GetDlgItem(hDlg, EditPORT);
+		hEditText = GetDlgItem(hDlg, EditText);
+		hShowText = GetDlgItem(hDlg, ShowText);
 		hSendButton = GetDlgItem(hDlg, IDOK);
-		SendMessage(hEdit1, EM_SETLIMITTEXT, BUFSIZE, 0);
+		hLoginButton = GetDlgItem(hDlg, IDSEND);
+		hExitButton = GetDlgItem(hDlg, IDCANCEL);
+		SendMessage(hEditText, EM_SETLIMITTEXT, BUFSIZE, 0);
+		#pragma endregion
 		return TRUE;
 	case WM_COMMAND:
 		switch (LOWORD(wParam)) {
-		case IDOK:
-			EnableWindow(hSendButton, FALSE); // 보내기 버튼 비활성화
+		case IDSEND:
+			EnableWindow(hSendButton, FALSE);		   // 보내기 버튼 비활성화
 			WaitForSingleObject(hReadEvent, INFINITE); // 읽기 완료 기다리기
-			GetDlgItemText(hDlg, IDC_EDIT1, buf, BUFSIZE + 1);
-			SetEvent(hWriteEvent); // 쓰기 완료 알리기
-			SetFocus(hEdit1);
-			SendMessage(hEdit1, EM_SETSEL, 0, -1);
+			GetDlgItemText(hDlg, EditText, buf, BUFSIZE + 1);
+			SetEvent(hWriteEvent);					   // 쓰기 완료 알리기
+			SetFocus(hEditText);
+			SendMessage(hEditText, EM_SETSEL, 0, -1);
 			return TRUE;
 		case IDCANCEL:
 			EndDialog(hDlg, IDCANCEL);
@@ -91,58 +149,11 @@ void DisplayText(char *fmt, ...)
 	char cbuf[BUFSIZE + 256];
 	vsprintf(cbuf, fmt, arg);
 
-	int nLength = GetWindowTextLength(hEdit2);
-	SendMessage(hEdit2, EM_SETSEL, nLength, nLength);
-	SendMessage(hEdit2, EM_REPLACESEL, FALSE, (LPARAM)cbuf);
+	int nLength = GetWindowTextLength(hShowText);
+	SendMessage(hShowText, EM_SETSEL, nLength, nLength);
+	SendMessage(hShowText, EM_REPLACESEL, FALSE, (LPARAM)cbuf);
 
 	va_end(arg);
-}
-
-// 소켓 함수 오류 출력 후 종료
-void err_quit(char *msg)
-{
-	LPVOID lpMsgBuf;
-	FormatMessage(
-		FORMAT_MESSAGE_ALLOCATE_BUFFER | FORMAT_MESSAGE_FROM_SYSTEM,
-		NULL, WSAGetLastError(),
-		MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT),
-		(LPTSTR)&lpMsgBuf, 0, NULL);
-	MessageBox(NULL, (LPCTSTR)lpMsgBuf, msg, MB_ICONERROR);
-	LocalFree(lpMsgBuf);
-	exit(1);
-}
-
-// 소켓 함수 오류 출력
-void err_display(char *msg)
-{
-	LPVOID lpMsgBuf;
-	FormatMessage(
-		FORMAT_MESSAGE_ALLOCATE_BUFFER | FORMAT_MESSAGE_FROM_SYSTEM,
-		NULL, WSAGetLastError(),
-		MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT),
-		(LPTSTR)&lpMsgBuf, 0, NULL);
-	DisplayText("[%s] %s", msg, (char *)lpMsgBuf);
-	LocalFree(lpMsgBuf);
-}
-
-// 사용자 정의 데이터 수신 함수
-int recvn(SOCKET s, char *buf, int len, int flags)
-{
-	int received;
-	char *ptr = buf;
-	int left = len;
-
-	while (left > 0) {
-		received = recv(s, ptr, left, flags);
-		if (received == SOCKET_ERROR)
-			return SOCKET_ERROR;
-		else if (received == 0)
-			break;
-		left -= received;
-		ptr += received;
-	}
-
-	return (len - left);
 }
 
 // TCP 클라이언트 시작 부분
