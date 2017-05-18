@@ -28,7 +28,7 @@ HANDLE hReadEvent, hWriteEvent; // 이벤트
 HWND hSendButton;    // 보내기 버튼
 HWND hLoginButton;    // 접속 버튼
 HWND hExitButton;    // 접속 버튼
-HWND hEditIP, hEditPort, hEditText, hShowText; // 편집 컨트롤
+HWND hEditIP, hEditPort, hEditText, hShowText, hEditName; // 편집 컨트롤
 
 #pragma endregion
 											   // 소켓 함수 오류 출력 후 종료
@@ -114,6 +114,7 @@ BOOL CALLBACK DlgProc(HWND hDlg, UINT uMsg, WPARAM wParam, LPARAM lParam)
 		hEditIP = GetDlgItem(hDlg, EditIP);
 		hEditPort = GetDlgItem(hDlg, EditPORT);
 		hEditText = GetDlgItem(hDlg, EditText);
+		hEditName = GetDlgItem(hDlg, EditName);
 		hShowText = GetDlgItem(hDlg, ShowText);
 		hSendButton = GetDlgItem(hDlg, IDOK);
 		hLoginButton = GetDlgItem(hDlg, IDSEND);
