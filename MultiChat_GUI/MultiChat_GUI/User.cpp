@@ -5,7 +5,7 @@
 #include <stdio.h>
 #include "resource.h"
 
-#define MULTICASTIP   "127.0.0.1"
+#define MULTICASTIP "235.7.8.9"
 #define REMOTEPORT 9000
 #define BUFSIZE    512
 
@@ -24,7 +24,10 @@ DWORD WINAPI ClientMain(LPVOID arg);
 #pragma endregion
 #pragma region Variable Declare
 SOCKET sock; // 소켓
-char buf[BUFSIZE + 1]; // 데이터 송수신 버퍼
+SOCKET receiveSock; // 소켓
+//SOCKET 하나더
+//char sendbuf[BUFSIZE + 1]; // 데이터 송수신 버퍼
+char buf[BUFSIZE + 1];	   // 데이터 송수신 버퍼
 HANDLE hReadEvent, hWriteEvent; // 이벤트
 HWND hSendButton;    // 보내기 버튼
 HWND hLoginButton;    // 접속 버튼
@@ -170,12 +173,12 @@ DWORD WINAPI Receiver(LPVOID arg)
 		return 1;
 
 	// socket()
-	SOCKET sock = socket(AF_INET, SOCK_DGRAM, 0);
-	if (sock == INVALID_SOCKET) err_quit("socket()");
+	receiveSock = socket(AF_INET, SOCK_DGRAM, 0);
+	if (receiveSock == INVALID_SOCKET) err_quit("socket()");
 
 	// SO_REUSEADDR 옵션 설정
 	BOOL optval = TRUE;
-	retval = setsockopt(sock, SOL_SOCKET,
+	retval = setsockopt(receiveSock, SOL_SOCKET,
 		SO_REUSEADDR, (char *)&optval, sizeof(optval));
 	if (retval == SOCKET_ERROR) err_quit("setsockopt()");
 
@@ -185,14 +188,14 @@ DWORD WINAPI Receiver(LPVOID arg)
 	localaddr.sin_family = AF_INET;
 	localaddr.sin_addr.s_addr = htonl(INADDR_ANY);
 	localaddr.sin_port = htons(REMOTEPORT);
-	retval = bind(sock, (SOCKADDR *)&localaddr, sizeof(localaddr));
+	retval = bind(receiveSock, (SOCKADDR *)&localaddr, sizeof(localaddr));
 	if (retval == SOCKET_ERROR) err_quit("bind()");
 
 	// 멀티캐스트 그룹 가입
 	struct ip_mreq mreq;
 	mreq.imr_multiaddr.s_addr = inet_addr(MULTICASTIP);
 	mreq.imr_interface.s_addr = htonl(INADDR_ANY);
-	retval = setsockopt(sock, IPPROTO_IP, IP_ADD_MEMBERSHIP,
+	retval = setsockopt(receiveSock, IPPROTO_IP, IP_ADD_MEMBERSHIP,
 		(char *)&mreq, sizeof(mreq));
 	if (retval == SOCKET_ERROR) err_quit("setsockopt()");
 
@@ -205,15 +208,15 @@ DWORD WINAPI Receiver(LPVOID arg)
 	while (1) {
 		// 데이터 받기
 		addrlen = sizeof(peeraddr);
-
-		retval = recvfrom(sock, name, 10, 0,
+/*
+		retval = recvfrom(receiveSock, name, 10, 0,
 			(SOCKADDR *)&peeraddr, &addrlen);
 		if (retval == SOCKET_ERROR) {
 			err_display("recvfrom()");
 			continue;
 		}
-		name[retval] = '\0';
-		retval = recvfrom(sock, buf, BUFSIZE, 0,
+		name[retval] = '\0';*/
+		retval = recvfrom(receiveSock, buf, BUFSIZE, 0,
 			(SOCKADDR *)&peeraddr, &addrlen);
 		if (retval == SOCKET_ERROR) {
 			err_display("recvfrom()");
@@ -224,16 +227,17 @@ DWORD WINAPI Receiver(LPVOID arg)
 		buf[retval] = '\0';
 		//printf("\n[UDP/%s:%d] %s\n", inet_ntoa(peeraddr.sin_addr), 
 		//	ntohs(peeraddr.sin_port), buf);
-		printf("%s : %s\n", name, buf);
+		//printf("%s : %s\n", name, buf);
+		DisplayText("%s\n", buf);
 	}
 
 	// 멀티캐스트 그룹 탈퇴
-	retval = setsockopt(sock, IPPROTO_IP, IP_DROP_MEMBERSHIP,
+	retval = setsockopt(receiveSock, IPPROTO_IP, IP_DROP_MEMBERSHIP,
 		(char *)&mreq, sizeof(mreq));
 	if (retval == SOCKET_ERROR) err_quit("setsockopt()");
 
 	// closesocket()
-	closesocket(sock);
+	closesocket(receiveSock);
 
 	// 윈속 종료
 	WSACleanup();
@@ -244,23 +248,40 @@ DWORD WINAPI Receiver(LPVOID arg)
 DWORD WINAPI ClientMain(LPVOID arg)
 {
 	int retval;
+	
+
 	// 윈속 초기화
 	WSADATA wsa;
 	if (WSAStartup(MAKEWORD(2, 2), &wsa) != 0)
 		return 1;
 
 	// socket()
-	sock = socket(AF_INET, SOCK_STREAM, 0);
+	sock = socket(AF_INET, SOCK_DGRAM, 0);
 	if (sock == INVALID_SOCKET) err_quit("socket()");
 
-	// connect()
-	SOCKADDR_IN serveraddr;
-	ZeroMemory(&serveraddr, sizeof(serveraddr));
-	serveraddr.sin_family = AF_INET;
-	serveraddr.sin_addr.s_addr = inet_addr(MULTICASTIP);
-	serveraddr.sin_port = htons(REMOTEPORT);
-	retval = connect(sock, (SOCKADDR *)&serveraddr, sizeof(serveraddr));
-	if (retval == SOCKET_ERROR) err_quit("connect()");
+	// 멀티캐스트 TTL 설정
+	int ttl = 2;
+	retval = setsockopt(sock, IPPROTO_IP, IP_MULTICAST_TTL,
+		(char *)&ttl, sizeof(ttl));
+	if (retval == SOCKET_ERROR) err_quit("setsockopt()");
+
+	// 소켓 주소 구조체 초기화
+	SOCKADDR_IN remoteaddr;
+	ZeroMemory(&remoteaddr, sizeof(remoteaddr));
+	remoteaddr.sin_family = AF_INET;
+	remoteaddr.sin_addr.s_addr = inet_addr(MULTICASTIP);
+	remoteaddr.sin_port = htons(REMOTEPORT);
+
+	// 데이터 통신에 사용할 변수
+	char sendbuf[BUFSIZE + 1];
+	int len;
+	HANDLE hThread;
+
+	//리시버 스레드 생성
+	hThread = CreateThread(NULL, 0, Receiver,
+		(LPVOID)sock, 0, NULL);
+	if (hThread == NULL) { closesocket(sock); }
+	else { CloseHandle(hThread); }
 
 	// 서버와 데이터 통신
 	while (1) {
@@ -273,29 +294,17 @@ DWORD WINAPI ClientMain(LPVOID arg)
 		}
 
 		// 데이터 보내기
-		retval = send(sock, buf, strlen(buf), 0);
+		retval = sendto(sock, buf, strlen(buf), 0,
+			(SOCKADDR *)&remoteaddr, sizeof(remoteaddr));
 		if (retval == SOCKET_ERROR) {
-			err_display("send()");
-			break;
+			err_display("sendto()");
+			continue;
 		}
 		DisplayText("[TCP 클라이언트] %d바이트를 보냈습니다.\r\n", retval);
 
-		// 데이터 받기
-		retval = recvn(sock, buf, retval, 0);
-		if (retval == SOCKET_ERROR) {
-			err_display("recv()");
-			break;
-		}
-		else if (retval == 0)
-			break;
-
-		// 받은 데이터 출력
-		buf[retval] = '\0';
-		DisplayText("[TCP 클라이언트] %d바이트를 받았습니다.\r\n", retval);
-		DisplayText("[받은 데이터] %s\r\n", buf);
 
 		EnableWindow(hSendButton, TRUE); // 보내기 버튼 활성화
-		SetEvent(hReadEvent); // 읽기 완료 알리기
+		SetEvent(hReadEvent);			 // 읽기 완료 알리기
 	}
 
 	return 0;

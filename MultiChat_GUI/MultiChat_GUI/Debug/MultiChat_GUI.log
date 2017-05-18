@@ -1,9 +1,12 @@
 ﻿  User.cpp
-c:\users\parkminhyun\documents\multichatting_gui\multichat_gui\multichat_gui\user.cpp(153): warning C4996: 'vsprintf': This function or variable may be unsafe. Consider using vsprintf_s instead. To disable deprecation, use _CRT_SECURE_NO_WARNINGS. See online help for details.
+c:\users\parkminhyun\documents\multichatting_gui\multichat_gui\multichat_gui\user.cpp(156): warning C4996: 'vsprintf': This function or variable may be unsafe. Consider using vsprintf_s instead. To disable deprecation, use _CRT_SECURE_NO_WARNINGS. See online help for details.
   c:\program files (x86)\windows kits\10\include\10.0.15063.0\ucrt\stdio.h(1467): note: 'vsprintf' 선언을 참조하십시오.
-c:\users\parkminhyun\documents\multichatting_gui\multichat_gui\multichat_gui\user.cpp(193): warning C4996: 'inet_addr': Use inet_pton() or InetPton() instead or define _WINSOCK_DEPRECATED_NO_WARNINGS to disable deprecated API warnings
+c:\users\parkminhyun\documents\multichatting_gui\multichat_gui\multichat_gui\user.cpp(196): warning C4996: 'inet_addr': Use inet_pton() or InetPton() instead or define _WINSOCK_DEPRECATED_NO_WARNINGS to disable deprecated API warnings
   c:\program files (x86)\windows kits\10\include\10.0.15063.0\um\winsock2.h(1830): note: 'inet_addr' 선언을 참조하십시오.
-c:\users\parkminhyun\documents\multichatting_gui\multichat_gui\multichat_gui\user.cpp(266): warning C4996: 'inet_addr': Use inet_pton() or InetPton() instead or define _WINSOCK_DEPRECATED_NO_WARNINGS to disable deprecated API warnings
+c:\users\parkminhyun\documents\multichatting_gui\multichat_gui\multichat_gui\user.cpp(206): warning C4101: 'name' :참조되지 않은 지역 변수입니다.
+c:\users\parkminhyun\documents\multichatting_gui\multichat_gui\multichat_gui\user.cpp(265): warning C4996: 'inet_addr': Use inet_pton() or InetPton() instead or define _WINSOCK_DEPRECATED_NO_WARNINGS to disable deprecated API warnings
   c:\program files (x86)\windows kits\10\include\10.0.15063.0\um\winsock2.h(1830): note: 'inet_addr' 선언을 참조하십시오.
+c:\users\parkminhyun\documents\multichatting_gui\multichat_gui\multichat_gui\user.cpp(270): warning C4101: 'len' :참조되지 않은 지역 변수입니다.
+c:\users\parkminhyun\documents\multichatting_gui\multichat_gui\multichat_gui\user.cpp(269): warning C4101: 'sendbuf' :참조되지 않은 지역 변수입니다.
   MultiChat_GUI.vcxproj -> C:\Users\ParkMinHyun\Documents\MultiChatting_GUI\MultiChat_GUI\Debug\MultiChat_GUI.exe
   MultiChat_GUI.vcxproj -> C:\Users\ParkMinHyun\Documents\MultiChatting_GUI\MultiChat_GUI\Debug\MultiChat_GUI.pdb (Partial PDB)
