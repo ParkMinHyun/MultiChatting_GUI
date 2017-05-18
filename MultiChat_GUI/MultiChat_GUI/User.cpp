@@ -1,11 +1,12 @@
 #pragma comment(lib, "ws2_32")
 #include <winsock2.h>
+#include <ws2tcpip.h>
 #include <stdlib.h>
 #include <stdio.h>
 #include "resource.h"
 
-#define SERVERIP   "127.0.0.1"
-#define SERVERPORT 9000
+#define MULTICASTIP   "127.0.0.1"
+#define REMOTEPORT 9000
 #define BUFSIZE    512
 
 #pragma region Function Declare
@@ -131,6 +132,7 @@ BOOL CALLBACK DlgProc(HWND hDlg, UINT uMsg, WPARAM wParam, LPARAM lParam)
 			SetEvent(hWriteEvent);					   // 쓰기 완료 알리기
 			SetFocus(hEditText);
 			SendMessage(hEditText, EM_SETSEL, 0, -1);
+			//MessageBox(hSendButton, "마우스 왼쪽 버튼을 눌렀습니다", "메시지 박스", MB_ICONERROR | MB_OK);
 			return TRUE;
 		case IDCANCEL:
 			EndDialog(hDlg, IDCANCEL);
@@ -157,11 +159,91 @@ void DisplayText(char *fmt, ...)
 	va_end(arg);
 }
 
-// TCP 클라이언트 시작 부분
-DWORD WINAPI ClientMain(LPVOID arg)
+// 클라이언트와 데이터 통신
+DWORD WINAPI Receiver(LPVOID arg)
 {
 	int retval;
 
+	// 윈속 초기화
+	WSADATA wsa;
+	if (WSAStartup(MAKEWORD(2, 2), &wsa) != 0)
+		return 1;
+
+	// socket()
+	SOCKET sock = socket(AF_INET, SOCK_DGRAM, 0);
+	if (sock == INVALID_SOCKET) err_quit("socket()");
+
+	// SO_REUSEADDR 옵션 설정
+	BOOL optval = TRUE;
+	retval = setsockopt(sock, SOL_SOCKET,
+		SO_REUSEADDR, (char *)&optval, sizeof(optval));
+	if (retval == SOCKET_ERROR) err_quit("setsockopt()");
+
+	// bind()
+	SOCKADDR_IN localaddr;
+	ZeroMemory(&localaddr, sizeof(localaddr));
+	localaddr.sin_family = AF_INET;
+	localaddr.sin_addr.s_addr = htonl(INADDR_ANY);
+	localaddr.sin_port = htons(REMOTEPORT);
+	retval = bind(sock, (SOCKADDR *)&localaddr, sizeof(localaddr));
+	if (retval == SOCKET_ERROR) err_quit("bind()");
+
+	// 멀티캐스트 그룹 가입
+	struct ip_mreq mreq;
+	mreq.imr_multiaddr.s_addr = inet_addr(MULTICASTIP);
+	mreq.imr_interface.s_addr = htonl(INADDR_ANY);
+	retval = setsockopt(sock, IPPROTO_IP, IP_ADD_MEMBERSHIP,
+		(char *)&mreq, sizeof(mreq));
+	if (retval == SOCKET_ERROR) err_quit("setsockopt()");
+
+	// 데이터 통신에 사용할 변수
+	SOCKADDR_IN peeraddr;
+	int addrlen;
+	char buf[BUFSIZE + 1];
+	char name[10];
+	// 멀티캐스트 데이터 받기
+	while (1) {
+		// 데이터 받기
+		addrlen = sizeof(peeraddr);
+
+		retval = recvfrom(sock, name, 10, 0,
+			(SOCKADDR *)&peeraddr, &addrlen);
+		if (retval == SOCKET_ERROR) {
+			err_display("recvfrom()");
+			continue;
+		}
+		name[retval] = '\0';
+		retval = recvfrom(sock, buf, BUFSIZE, 0,
+			(SOCKADDR *)&peeraddr, &addrlen);
+		if (retval == SOCKET_ERROR) {
+			err_display("recvfrom()");
+			continue;
+		}
+
+		// 받은 데이터 출력
+		buf[retval] = '\0';
+		//printf("\n[UDP/%s:%d] %s\n", inet_ntoa(peeraddr.sin_addr), 
+		//	ntohs(peeraddr.sin_port), buf);
+		printf("%s : %s\n", name, buf);
+	}
+
+	// 멀티캐스트 그룹 탈퇴
+	retval = setsockopt(sock, IPPROTO_IP, IP_DROP_MEMBERSHIP,
+		(char *)&mreq, sizeof(mreq));
+	if (retval == SOCKET_ERROR) err_quit("setsockopt()");
+
+	// closesocket()
+	closesocket(sock);
+
+	// 윈속 종료
+	WSACleanup();
+	return 0;
+}
+
+// 클라이언트 시작 부분
+DWORD WINAPI ClientMain(LPVOID arg)
+{
+	int retval;
 	// 윈속 초기화
 	WSADATA wsa;
 	if (WSAStartup(MAKEWORD(2, 2), &wsa) != 0)
@@ -175,8 +257,8 @@ DWORD WINAPI ClientMain(LPVOID arg)
 	SOCKADDR_IN serveraddr;
 	ZeroMemory(&serveraddr, sizeof(serveraddr));
 	serveraddr.sin_family = AF_INET;
-	serveraddr.sin_addr.s_addr = inet_addr(SERVERIP);
-	serveraddr.sin_port = htons(SERVERPORT);
+	serveraddr.sin_addr.s_addr = inet_addr(MULTICASTIP);
+	serveraddr.sin_port = htons(REMOTEPORT);
 	retval = connect(sock, (SOCKADDR *)&serveraddr, sizeof(serveraddr));
 	if (retval == SOCKET_ERROR) err_quit("connect()");
 
