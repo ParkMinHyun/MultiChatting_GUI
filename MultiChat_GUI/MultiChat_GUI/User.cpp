@@ -300,7 +300,7 @@ DWORD WINAPI ClientMain(LPVOID arg)
 			err_display("sendto()");
 			continue;
 		}
-		DisplayText("[TCP 클라이언트] %d바이트를 보냈습니다.\r\n", retval);
+		//DisplayText("%s\n", buf);
 
 
 		EnableWindow(hSendButton, TRUE); // 보내기 버튼 활성화

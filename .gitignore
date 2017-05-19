@@ -30,6 +30,8 @@
 
 # Executables
 *.exe
+*.suo
+*.Browse.VC.db
 *.out
 *.app
 *.i*86
