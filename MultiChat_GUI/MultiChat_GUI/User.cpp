@@ -5,9 +5,12 @@
 #include <stdio.h>
 #include "resource.h"
 
-#define MULTICASTIP "235.7.8.9"
+#define MULTICASTIP "235.7.8.10"
 #define REMOTEPORT 9000
 #define BUFSIZE    512
+
+char *multicastIP;
+char *multicastPort;
 
 #pragma region Function Declare
 // 대화상자 프로시저
@@ -21,21 +24,27 @@ void err_display(char *msg);
 int recvn(SOCKET s, char *buf, int len, int flags);
 // 소켓 통신 스레드 함수
 DWORD WINAPI ClientMain(LPVOID arg);
+// 소켓 초기화 함수
+void socketStructInit();
 #pragma endregion
 #pragma region Variable Declare
 SOCKET sock; // 소켓
 SOCKET receiveSock; // 소켓
 //SOCKET 하나더
 //char sendbuf[BUFSIZE + 1]; // 데이터 송수신 버퍼
+SOCKADDR_IN remoteaddr;  //소켓 구조체
 char buf[BUFSIZE + 1];	   // 데이터 송수신 버퍼
-HANDLE hReadEvent, hWriteEvent; // 이벤트
+HANDLE hReadEvent, hWriteEvent; // 전송이벤트
+HANDLE hLoginReadEvent, hLoginWriteEvent; // 로그인이벤트
 HWND hSendButton;    // 보내기 버튼
 HWND hLoginButton;    // 접속 버튼
 HWND hExitButton;    // 접속 버튼
 HWND hEditIP, hEditPort, hEditText, hShowText, hEditName; // 편집 컨트롤
 
 #pragma endregion
-											   // 소켓 함수 오류 출력 후 종료
+
+bool twiceLogine = false;
+
 void err_quit(char *msg)
 {
 	LPVOID lpMsgBuf;
@@ -48,7 +57,6 @@ void err_quit(char *msg)
 	LocalFree(lpMsgBuf);
 	exit(1);
 }
-// 소켓 함수 오류 출력
 void err_display(char *msg)
 {
 	LPVOID lpMsgBuf;
@@ -60,7 +68,6 @@ void err_display(char *msg)
 	DisplayText("[%s] %s", msg, (char *)lpMsgBuf);
 	LocalFree(lpMsgBuf);
 }
-// 사용자 정의 데이터 수신 함수
 int recvn(SOCKET s, char *buf, int len, int flags)
 {
 	int received;
@@ -84,11 +91,18 @@ int recvn(SOCKET s, char *buf, int len, int flags)
 int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance,
 	LPSTR lpCmdLine, int nCmdShow)
 {
+	multicastIP = (char *)malloc(sizeof(char) * 15);
+	multicastPort = (char *)malloc(sizeof(char) * 6);
+
 	// 이벤트 생성
 	hReadEvent = CreateEvent(NULL, FALSE, TRUE, NULL);
 	if (hReadEvent == NULL) return 1;
 	hWriteEvent = CreateEvent(NULL, FALSE, FALSE, NULL);
 	if (hWriteEvent == NULL) return 1;
+	hLoginReadEvent = CreateEvent(NULL, FALSE, TRUE, NULL);
+	if (hLoginReadEvent == NULL) return 1;
+	hLoginWriteEvent = CreateEvent(NULL, FALSE, FALSE, NULL);
+	if (hLoginWriteEvent == NULL) return 1;
 
 	// 소켓 통신 스레드 생성
 	CreateThread(NULL, 0, ClientMain, NULL, 0, NULL);
@@ -99,6 +113,8 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance,
 	// 이벤트 제거
 	CloseHandle(hReadEvent);
 	CloseHandle(hWriteEvent);
+	CloseHandle(hLoginReadEvent);
+	CloseHandle(hLoginWriteEvent);
 
 	// closesocket()
 	closesocket(sock);
@@ -113,8 +129,7 @@ BOOL CALLBACK DlgProc(HWND hDlg, UINT uMsg, WPARAM wParam, LPARAM lParam)
 {
 	switch (uMsg) {
 	case WM_INITDIALOG:
-		#pragma region Init Dialog
-
+#pragma region Init Dialog
 		hEditIP = GetDlgItem(hDlg, EditIP);
 		hEditPort = GetDlgItem(hDlg, EditPORT);
 		hEditText = GetDlgItem(hDlg, EditText);
@@ -124,19 +139,34 @@ BOOL CALLBACK DlgProc(HWND hDlg, UINT uMsg, WPARAM wParam, LPARAM lParam)
 		hLoginButton = GetDlgItem(hDlg, IDSEND);
 		hExitButton = GetDlgItem(hDlg, IDCANCEL);
 		SendMessage(hEditText, EM_SETLIMITTEXT, BUFSIZE, 0);
-		#pragma endregion
+#pragma endregion
 		return TRUE;
 	case WM_COMMAND:
 		switch (LOWORD(wParam)) {
+
+		case IDOK:
+			WaitForSingleObject(hLoginReadEvent, INFINITE); // 읽기 완료 기다리기
+			GetDlgItemText(hDlg, EditIP, multicastIP, BUFSIZE + 1);
+			GetDlgItemText(hDlg, EditPORT, multicastPort, BUFSIZE + 1);
+			SetEvent(hLoginWriteEvent);					   // 쓰기 완료 알리기
+			SetFocus(hEditText);
+			socketStructInit();
+			SendMessage(hEditIP, EM_SETSEL, 0, -1);
+			SendMessage(hEditPort, EM_SETSEL, 0, -1);
+			return  TRUE;
+
 		case IDSEND:
-			EnableWindow(hSendButton, FALSE);		   // 보내기 버튼 비활성화
 			WaitForSingleObject(hReadEvent, INFINITE); // 읽기 완료 기다리기
 			GetDlgItemText(hDlg, EditText, buf, BUFSIZE + 1);
+			/*GetDlgItemText(hDlg, EditIP, multicastIP, 16);
+			MessageBox(hSendButton, multicastIP, "메시지 박스", MB_ICONERROR | MB_OK);*/
+
 			SetEvent(hWriteEvent);					   // 쓰기 완료 알리기
 			SetFocus(hEditText);
 			SendMessage(hEditText, EM_SETSEL, 0, -1);
 			//MessageBox(hSendButton, "마우스 왼쪽 버튼을 눌렀습니다", "메시지 박스", MB_ICONERROR | MB_OK);
 			return TRUE;
+
 		case IDCANCEL:
 			EndDialog(hDlg, IDCANCEL);
 			return TRUE;
@@ -187,13 +217,13 @@ DWORD WINAPI Receiver(LPVOID arg)
 	ZeroMemory(&localaddr, sizeof(localaddr));
 	localaddr.sin_family = AF_INET;
 	localaddr.sin_addr.s_addr = htonl(INADDR_ANY);
-	localaddr.sin_port = htons(REMOTEPORT);
+	localaddr.sin_port = htons(atoi(multicastPort));
 	retval = bind(receiveSock, (SOCKADDR *)&localaddr, sizeof(localaddr));
 	if (retval == SOCKET_ERROR) err_quit("bind()");
 
 	// 멀티캐스트 그룹 가입
 	struct ip_mreq mreq;
-	mreq.imr_multiaddr.s_addr = inet_addr(MULTICASTIP);
+	mreq.imr_multiaddr.s_addr = inet_addr(multicastIP);
 	mreq.imr_interface.s_addr = htonl(INADDR_ANY);
 	retval = setsockopt(receiveSock, IPPROTO_IP, IP_ADD_MEMBERSHIP,
 		(char *)&mreq, sizeof(mreq));
@@ -208,8 +238,8 @@ DWORD WINAPI Receiver(LPVOID arg)
 	while (1) {
 		// 데이터 받기
 		addrlen = sizeof(peeraddr);
-/*
-		retval = recvfrom(receiveSock, name, 10, 0,
+
+		/*retval = recvfrom(receiveSock, name, 10, 0,
 			(SOCKADDR *)&peeraddr, &addrlen);
 		if (retval == SOCKET_ERROR) {
 			err_display("recvfrom()");
@@ -228,6 +258,7 @@ DWORD WINAPI Receiver(LPVOID arg)
 		//printf("\n[UDP/%s:%d] %s\n", inet_ntoa(peeraddr.sin_addr), 
 		//	ntohs(peeraddr.sin_port), buf);
 		//printf("%s : %s\n", name, buf);
+		DisplayText("[%s:%d] : ", inet_ntoa(peeraddr.sin_addr), ntohs(peeraddr.sin_port));
 		DisplayText("%s\n", buf);
 	}
 
@@ -244,36 +275,46 @@ DWORD WINAPI Receiver(LPVOID arg)
 	return 0;
 }
 
+void socketStructInit() {
+	// 소켓 주소 구조체 초기화
+	ZeroMemory(&remoteaddr, sizeof(remoteaddr));
+	remoteaddr.sin_family = AF_INET;
+	remoteaddr.sin_addr.s_addr = inet_addr(multicastIP);
+	remoteaddr.sin_port = htons(atoi(multicastPort));
+}
+
 // 클라이언트 시작 부분
 DWORD WINAPI ClientMain(LPVOID arg)
 {
 	int retval;
-	
 
-	// 윈속 초기화
-	WSADATA wsa;
-	if (WSAStartup(MAKEWORD(2, 2), &wsa) != 0)
-		return 1;
+	while (1) {
+		// 쓰기 완료 기다리기
+		WaitForSingleObject(hLoginWriteEvent, INFINITE);
 
-	// socket()
-	sock = socket(AF_INET, SOCK_DGRAM, 0);
-	if (sock == INVALID_SOCKET) err_quit("socket()");
+		// 윈속 초기화
+		WSADATA wsa;
+		if (WSAStartup(MAKEWORD(2, 2), &wsa) != 0)
+			return 1;
 
-	// 멀티캐스트 TTL 설정
-	int ttl = 2;
-	retval = setsockopt(sock, IPPROTO_IP, IP_MULTICAST_TTL,
-		(char *)&ttl, sizeof(ttl));
-	if (retval == SOCKET_ERROR) err_quit("setsockopt()");
+		// socket()
+		sock = socket(AF_INET, SOCK_DGRAM, 0);
+		if (sock == INVALID_SOCKET) err_quit("socket()");
 
-	// 소켓 주소 구조체 초기화
-	SOCKADDR_IN remoteaddr;
-	ZeroMemory(&remoteaddr, sizeof(remoteaddr));
-	remoteaddr.sin_family = AF_INET;
-	remoteaddr.sin_addr.s_addr = inet_addr(MULTICASTIP);
-	remoteaddr.sin_port = htons(REMOTEPORT);
+		// 멀티캐스트 TTL 설정
+		int ttl = 2;
+		retval = setsockopt(sock, IPPROTO_IP, IP_MULTICAST_TTL,
+			(char *)&ttl, sizeof(ttl));
+		if (retval == SOCKET_ERROR) err_quit("setsockopt()");
+		
+		socketStructInit();
+
+		SetEvent(hLoginReadEvent);			 // 읽기 완료 알리기
+		twiceLogine = true;
+		break;
+	}
 
 	// 데이터 통신에 사용할 변수
-	char sendbuf[BUFSIZE + 1];
 	int len;
 	HANDLE hThread;
 
@@ -285,10 +326,10 @@ DWORD WINAPI ClientMain(LPVOID arg)
 
 	// 서버와 데이터 통신
 	while (1) {
-		WaitForSingleObject(hWriteEvent, INFINITE); // 쓰기 완료 기다리기
-													// 문자열 길이가 0이면 보내지 않음
+		// 쓰기 완료 기다리기
+		WaitForSingleObject(hWriteEvent, INFINITE);
+		// 문자열 길이가 0이면 보내지 않음
 		if (strlen(buf) == 0) {
-			EnableWindow(hSendButton, TRUE); // 보내기 버튼 활성화
 			SetEvent(hReadEvent); // 읽기 완료 알리기
 			continue;
 		}
@@ -303,7 +344,6 @@ DWORD WINAPI ClientMain(LPVOID arg)
 		//DisplayText("%s\n", buf);
 
 
-		EnableWindow(hSendButton, TRUE); // 보내기 버튼 활성화
 		SetEvent(hReadEvent);			 // 읽기 완료 알리기
 	}
 
