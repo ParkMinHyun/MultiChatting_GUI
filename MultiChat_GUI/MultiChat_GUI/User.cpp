@@ -28,8 +28,7 @@ DWORD WINAPI ClientMain(LPVOID arg);
 #pragma region Variable Declare
 SOCKET sock; // 소켓
 SOCKET receiveSock; // 소켓
-//SOCKET 하나더
-//char sendbuf[BUFSIZE + 1]; // 데이터 송수신 버퍼
+struct ip_mreq mreq;
 SOCKADDR_IN remoteaddr;  //소켓 구조체
 char buf[BUFSIZE + 1];	   // 데이터 송수신 버퍼
 HANDLE hReadEvent, hWriteEvent; // 전송이벤트
@@ -38,7 +37,7 @@ HWND hSendButton;    // 보내기 버튼
 HWND hLoginButton;    // 접속 버튼
 HWND hExitButton;    // 접속 버튼
 HWND hEditIP, hEditPort, hEditText, hShowText, hEditName; // 편집 컨트롤
-
+bool twiceCheck = false;
 #pragma endregion
 
 void err_quit(char *msg)
@@ -102,6 +101,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance,
 
 	// 소켓 통신 스레드 생성
 	CreateThread(NULL, 0, ClientMain, NULL, 0, NULL);
+	
 
 	// 대화상자 생성
 	DialogBox(hInstance, MAKEINTRESOURCE(IDD_DIALOG1), NULL, DlgProc);
@@ -148,6 +148,30 @@ BOOL CALLBACK DlgProc(HWND hDlg, UINT uMsg, WPARAM wParam, LPARAM lParam)
 			SetFocus(hEditText);
 			SendMessage(hEditIP, EM_SETSEL, 0, -1);
 			SendMessage(hEditPort, EM_SETSEL, 0, -1);
+
+			if (twiceCheck == true) {
+				int retval;
+				// 멀티캐스트 그룹 탈퇴
+			    retval = setsockopt(receiveSock, IPPROTO_IP, IP_DROP_MEMBERSHIP,
+					(char *)&mreq, sizeof(mreq));
+				if (retval == SOCKET_ERROR) err_quit("setsockopt()");
+
+				// 소켓 주소 구조체 초기화
+				ZeroMemory(&remoteaddr, sizeof(remoteaddr));
+				remoteaddr.sin_family = AF_INET;
+				remoteaddr.sin_addr.s_addr = inet_addr("235.7.8.9");
+				remoteaddr.sin_port = htons(atoi(multicastPort));
+
+				// 멀티캐스트 그룹 가입
+				mreq.imr_multiaddr.s_addr = inet_addr("235.7.8.9");
+				mreq.imr_interface.s_addr = htonl(INADDR_ANY);
+				retval = setsockopt(receiveSock, IPPROTO_IP, IP_ADD_MEMBERSHIP,
+					(char *)&mreq, sizeof(mreq));
+				if (retval == SOCKET_ERROR) err_quit("setsockopt()");
+
+				twiceCheck = false;
+			}
+			twiceCheck = true;
 			return  TRUE;
 
 		case IDSEND:
@@ -157,7 +181,6 @@ BOOL CALLBACK DlgProc(HWND hDlg, UINT uMsg, WPARAM wParam, LPARAM lParam)
 			MessageBox(hSendButton, multicastIP, "메시지 박스", MB_ICONERROR | MB_OK);*/
 
 			SetEvent(hWriteEvent);					   // 쓰기 완료 알리기
-			SetFocus(hEditText);
 			SendMessage(hEditText, EM_SETSEL, 0, -1);
 			//MessageBox(hSendButton, "마우스 왼쪽 버튼을 눌렀습니다", "메시지 박스", MB_ICONERROR | MB_OK);
 			return TRUE;
@@ -217,7 +240,6 @@ DWORD WINAPI Receiver(LPVOID arg)
 	if (retval == SOCKET_ERROR) err_quit("bind()");
 
 	// 멀티캐스트 그룹 가입
-	struct ip_mreq mreq;
 	mreq.imr_multiaddr.s_addr = inet_addr(multicastIP);
 	mreq.imr_interface.s_addr = htonl(INADDR_ANY);
 	retval = setsockopt(receiveSock, IPPROTO_IP, IP_ADD_MEMBERSHIP,
@@ -253,8 +275,7 @@ DWORD WINAPI Receiver(LPVOID arg)
 		//printf("\n[UDP/%s:%d] %s\n", inet_ntoa(peeraddr.sin_addr), 
 		//	ntohs(peeraddr.sin_port), buf);
 		//printf("%s : %s\n", name, buf);
-		DisplayText("[%s:%d] : ", inet_ntoa(peeraddr.sin_addr), ntohs(peeraddr.sin_port));
-		DisplayText("%s\n", buf);
+		DisplayText("[%s:%d] : %s\n", inet_ntoa(peeraddr.sin_addr), ntohs(peeraddr.sin_port), buf);
 	}
 
 	// 멀티캐스트 그룹 탈퇴
@@ -294,7 +315,7 @@ DWORD WINAPI ClientMain(LPVOID arg)
 		retval = setsockopt(sock, IPPROTO_IP, IP_MULTICAST_TTL,
 			(char *)&ttl, sizeof(ttl));
 		if (retval == SOCKET_ERROR) err_quit("setsockopt()");
-		
+
 		// 소켓 주소 구조체 초기화
 		ZeroMemory(&remoteaddr, sizeof(remoteaddr));
 		remoteaddr.sin_family = AF_INET;
