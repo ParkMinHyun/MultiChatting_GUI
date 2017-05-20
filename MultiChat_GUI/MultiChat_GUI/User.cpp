@@ -24,8 +24,6 @@ void err_display(char *msg);
 int recvn(SOCKET s, char *buf, int len, int flags);
 // 소켓 통신 스레드 함수
 DWORD WINAPI ClientMain(LPVOID arg);
-// 소켓 초기화 함수
-void socketStructInit();
 #pragma endregion
 #pragma region Variable Declare
 SOCKET sock; // 소켓
@@ -42,8 +40,6 @@ HWND hExitButton;    // 접속 버튼
 HWND hEditIP, hEditPort, hEditText, hShowText, hEditName; // 편집 컨트롤
 
 #pragma endregion
-
-bool twiceLogine = false;
 
 void err_quit(char *msg)
 {
@@ -150,7 +146,6 @@ BOOL CALLBACK DlgProc(HWND hDlg, UINT uMsg, WPARAM wParam, LPARAM lParam)
 			GetDlgItemText(hDlg, EditPORT, multicastPort, BUFSIZE + 1);
 			SetEvent(hLoginWriteEvent);					   // 쓰기 완료 알리기
 			SetFocus(hEditText);
-			socketStructInit();
 			SendMessage(hEditIP, EM_SETSEL, 0, -1);
 			SendMessage(hEditPort, EM_SETSEL, 0, -1);
 			return  TRUE;
@@ -275,13 +270,6 @@ DWORD WINAPI Receiver(LPVOID arg)
 	return 0;
 }
 
-void socketStructInit() {
-	// 소켓 주소 구조체 초기화
-	ZeroMemory(&remoteaddr, sizeof(remoteaddr));
-	remoteaddr.sin_family = AF_INET;
-	remoteaddr.sin_addr.s_addr = inet_addr(multicastIP);
-	remoteaddr.sin_port = htons(atoi(multicastPort));
-}
 
 // 클라이언트 시작 부분
 DWORD WINAPI ClientMain(LPVOID arg)
@@ -307,10 +295,13 @@ DWORD WINAPI ClientMain(LPVOID arg)
 			(char *)&ttl, sizeof(ttl));
 		if (retval == SOCKET_ERROR) err_quit("setsockopt()");
 		
-		socketStructInit();
+		// 소켓 주소 구조체 초기화
+		ZeroMemory(&remoteaddr, sizeof(remoteaddr));
+		remoteaddr.sin_family = AF_INET;
+		remoteaddr.sin_addr.s_addr = inet_addr(multicastIP);
+		remoteaddr.sin_port = htons(atoi(multicastPort));
 
 		SetEvent(hLoginReadEvent);			 // 읽기 완료 알리기
-		twiceLogine = true;
 		break;
 	}
 
