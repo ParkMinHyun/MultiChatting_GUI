@@ -2,6 +2,7 @@
 #include <winsock2.h>
 #include <ws2tcpip.h>
 #include <stdlib.h>
+#include <ctime>
 #include <string.h>
 #include <stdio.h>
 #include "resource.h"
@@ -43,15 +44,10 @@ HWND hExitButton;    // 나가기 버튼
 HWND hEditIP, hEditPort, hEditText, hShowText, hEditName; // 편집 컨트롤
 bool twiceCheck = false;
 #pragma endregion
-/*
-typedef struct User {
-	char nickName[NAMESIZE];
-}User;
-
-User user[USERSIZE];
-int numberOfpeople = 0;*/
 
 char name[NAMESIZE];
+char userIDString[NAMESIZE];
+int userID;
 
 void err_quit(char *msg)
 {
@@ -101,6 +97,10 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance,
 {
 	multicastIP = (char *)malloc(sizeof(char) * 15);
 	multicastPort = (char *)malloc(sizeof(char) * 6);
+	//시간에 따른 랜덤 UserID값 생성
+	srand(time(NULL));
+	userID = rand();
+	itoa(userID, userIDString, 10);
 
 	// 이벤트 생성
 	hReadEvent = CreateEvent(NULL, FALSE, TRUE, NULL);
