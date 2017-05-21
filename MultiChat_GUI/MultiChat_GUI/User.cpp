@@ -1,6 +1,6 @@
 #pragma comment(lib, "ws2_32")
 #include <winsock2.h>
-#include <ws2tcpip.h>4
+#include <ws2tcpip.h>
 #include <stdlib.h>
 #include <ctime>
 #include <string.h>
@@ -12,7 +12,6 @@
 #define BUFSIZE    512
 #define NAMESIZE 10
 #define IDSIZE 10
-#define DUPSIZE 5
 
 char *multicastIP;
 char *multicastPort;
@@ -30,6 +29,8 @@ int recvn(SOCKET s, char *buf, int len, int flags);
 // 소켓 통신 스레드 함수
 DWORD WINAPI ClientMain(LPVOID arg);
 #pragma endregion
+bool checkClassDIP(char inputIP[]);
+bool checkPort(char inputPort[]);
 #pragma region Variable Declare
 SOCKET sock; // 소켓
 SOCKET receiveSock; // 소켓
@@ -46,7 +47,6 @@ HWND hEditIP, hEditPort, hEditText, hShowText, hEditName; // 편집 컨트롤
 bool twiceCheck = false;
 #pragma endregion
 
-char checkDup[DUPSIZE];
 char name[NAMESIZE];
 char userIDString[IDSIZE];
 int userID;
@@ -114,10 +114,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance,
 	hLoginWriteEvent = CreateEvent(NULL, FALSE, FALSE, NULL);
 	if (hLoginWriteEvent == NULL) return 1;
 
-	// 소켓 통신 스레드 생성
-	CreateThread(NULL, 0, ClientMain, NULL, 0, NULL);
-
-
+	
 	// 대화상자 생성
 	DialogBox(hInstance, MAKEINTRESOURCE(IDD_DIALOG1), NULL, DlgProc);
 
@@ -159,14 +156,30 @@ BOOL CALLBACK DlgProc(HWND hDlg, UINT uMsg, WPARAM wParam, LPARAM lParam)
 		case IDOK:
 			WaitForSingleObject(hLoginReadEvent, INFINITE); // 읽기 완료 기다리기
 			GetDlgItemText(hDlg, EditIP, multicastIP, BUFSIZE + 1);
+
+			if (checkClassDIP(multicastIP) == false)
+			{
+				MessageBox(hDlg, "ClassD주소만 입력하세요", "IP오류", MB_OK);
+				SetFocus(hEditIP);
+				return FALSE;
+			}
 			GetDlgItemText(hDlg, EditPORT, multicastPort, BUFSIZE + 1);
+			if (checkPort(multicastPort) == false)
+			{
+				MessageBox(hDlg, "올바른 Port번호만 입력하세요", "Port오류", MB_OK);
+				SetFocus(hEditIP);
+				return FALSE;
+			}
 			GetDlgItemText(hDlg, EditName, name, NAMESIZE + 1);
+			// 소켓 통신 스레드 생성
+			CreateThread(NULL, 0, ClientMain, NULL, 0, NULL);
+
+
 			SetEvent(hLoginWriteEvent);					   // 쓰기 완료 알리기
 			SetFocus(hEditText);
+			SendMessage(hEditName, EM_SETSEL, 0, -1);
 			SendMessage(hEditIP, EM_SETSEL, 0, -1);
 			SendMessage(hEditPort, EM_SETSEL, 0, -1);
-			SendMessage(hEditName, EM_SETSEL, 0, -1);
-
 			//if (twiceCheck == true) {
 			//	int retval;
 			//	// 멀티캐스트 그룹 탈퇴
@@ -238,9 +251,8 @@ void DisplayText(char *fmt, ...)
 // 클라이언트와 데이터 통신
 DWORD WINAPI Receiver(LPVOID arg)
 {
-	#pragma region initReceiver
-
 	int retval;
+
 	// 윈속 초기화
 	WSADATA wsa;
 	if (WSAStartup(MAKEWORD(2, 2), &wsa) != 0)
@@ -278,9 +290,6 @@ DWORD WINAPI Receiver(LPVOID arg)
 	char nameBuf[NAMESIZE + 1];
 	char idBuf[IDSIZE + 1];
 	char buf[BUFSIZE + 1];
-
-#pragma endregion
-
 	// 멀티캐스트 데이터 받기
 	while (1) {
 		// 데이터 받기
@@ -305,30 +314,9 @@ DWORD WINAPI Receiver(LPVOID arg)
 		}
 		idBuf[retval] = '\0';
 
-
-		if (!strcmp(nameBuf, name) && strcmp(idBuf, userIDString))
-		{
-			checkDup[0] = 'O';
-			// 데이터 보내기
-			retval = sendto(receiveSock, checkDup, strlen(checkDup), 0,
-				(SOCKADDR *)&peeraddr, sizeof(peeraddr));
-			if (retval == SOCKET_ERROR) {
-				err_display("sendto()");
-				continue;
-			}
+		if (!strcmp(nameBuf, name) && strcmp(idBuf, userIDString)) {
+			MessageBox(hSendButton, nameBuf, "메시지 박스", MB_ICONERROR | MB_OK);
 		}
-		else
-		{
-			// 데이터 보내기
-			retval = sendto(receiveSock, "X", 1, 0,
-				(SOCKADDR *)&peeraddr, sizeof(peeraddr));
-			if (retval == SOCKET_ERROR) {
-				err_display("sendto()");
-				continue;
-			}
-		}
-
-		// 데이터 받기
 		retval = recvfrom(receiveSock, buf, BUFSIZE, 0,
 			(SOCKADDR *)&peeraddr, &addrlen);
 		if (retval == SOCKET_ERROR) {
@@ -338,8 +326,6 @@ DWORD WINAPI Receiver(LPVOID arg)
 
 		// 받은 데이터 출력
 		buf[retval] = '\0';
-		//printf("\n[UDP/%s:%d] %s\n", inet_ntoa(peeraddr.sin_addr), 
-		//	ntohs(peeraddr.sin_port), buf);
 		DisplayText("%s ", nameBuf);
 		DisplayText("[%s:%d] : %s\n", inet_ntoa(peeraddr.sin_addr), ntohs(peeraddr.sin_port), buf);
 	}
@@ -361,17 +347,11 @@ DWORD WINAPI Receiver(LPVOID arg)
 // 클라이언트 시작 부분
 DWORD WINAPI ClientMain(LPVOID arg)
 {
-	#pragma region initMain
 	int retval;
-	int dupAddr;
-	char dupBuf[DUPSIZE + 1];
-
 
 	while (1) {
 		// 쓰기 완료 기다리기
 		WaitForSingleObject(hLoginWriteEvent, INFINITE);
-
-		//strcpy(user[numberOfpeople++].nickName, name);
 
 		// 윈속 초기화
 		WSADATA wsa;
@@ -408,8 +388,6 @@ DWORD WINAPI ClientMain(LPVOID arg)
 	if (hThread == NULL) { closesocket(sock); }
 	else { CloseHandle(hThread); }
 
-#pragma endregion
-
 	// 서버와 데이터 통신
 	while (1) {
 		// 쓰기 완료 기다리기
@@ -436,20 +414,6 @@ DWORD WINAPI ClientMain(LPVOID arg)
 			continue;
 		}
 
-		//235.7.8.10
-		dupAddr = sizeof(remoteaddr);
-		// 중복 체크 받기
-		retval = recvfrom(sock, dupBuf, DUPSIZE, 0,
-			(SOCKADDR *)&remoteaddr, &dupAddr);
-		if (retval == SOCKET_ERROR) {
-			err_display("recvfrom()");
-			continue;
-		}
-		dupBuf[retval] = '\0';
-
-		if (!strcmp(dupBuf, "X"))
-			DisplayText("%s\n", dupBuf);
-
 		// 데이터 보내기
 		retval = sendto(sock, buf, strlen(buf), 0,
 			(SOCKADDR *)&remoteaddr, sizeof(remoteaddr));
@@ -457,9 +421,34 @@ DWORD WINAPI ClientMain(LPVOID arg)
 			err_display("sendto()");
 			continue;
 		}
+		//DisplayText("%s\n", buf);
 
 		SetEvent(hReadEvent);			 // 읽기 완료 알리기
 	}
 
 	return 0;
+}
+
+bool checkClassDIP(char inputIP[])
+{
+	char checkClassDIP[3];
+	for (int i = 0; i < 3; i++)
+	{
+		checkClassDIP[i] = inputIP[i];
+	}
+	int convertInputIP = atoi(checkClassDIP);
+	
+	if (convertInputIP >= 224 && convertInputIP < 240)
+		return true;
+	else
+		return false;
+}
+
+bool checkPort(char inputPort[]) {
+	int convertInputPort = atoi(inputPort);
+
+	if (convertInputPort >= 1024 && convertInputPort <= 65535)
+		return true;
+	else
+		return false;
 }
