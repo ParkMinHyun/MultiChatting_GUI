@@ -3,6 +3,7 @@
 #include <ws2tcpip.h>
 #include <stdlib.h>
 #include <ctime>
+#include <time.h>
 #include <string.h>
 #include <stdio.h>
 #include "resource.h"
@@ -324,10 +325,16 @@ DWORD WINAPI Receiver(LPVOID arg)
 			continue;
 		}
 
+		struct tm t;
+		time_t timer;
+
+		timer = time(NULL);    // 현재 시각을 초 단위로 얻기
+		localtime_s(&t, &timer); // 초 단위의 시간을 분리하여 구조체에 넣기
+
 		// 받은 데이터 출력
 		buf[retval] = '\0';
-		DisplayText("%s ", nameBuf);
-		DisplayText("[%s:%d] : %s\n", inet_ntoa(peeraddr.sin_addr), ntohs(peeraddr.sin_port), buf);
+		DisplayText("%s %d일 %d시 %d분 ", nameBuf, t.tm_mday, t.tm_hour, t.tm_min);
+		DisplayText("[%s] : %s\n", inet_ntoa(peeraddr.sin_addr), buf);
 	}
 
 	// 멀티캐스트 그룹 탈퇴
