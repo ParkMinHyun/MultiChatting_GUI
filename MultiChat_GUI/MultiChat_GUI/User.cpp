@@ -11,7 +11,7 @@
 #define REMOTEPORT 9000
 #define BUFSIZE    512
 #define NAMESIZE 10
-#define USERSIZE 10
+#define IDSIZE 10
 
 char *multicastIP;
 char *multicastPort;
@@ -46,7 +46,7 @@ bool twiceCheck = false;
 #pragma endregion
 
 char name[NAMESIZE];
-char userIDString[NAMESIZE];
+char userIDString[IDSIZE];
 int userID;
 
 void err_quit(char *msg)
@@ -158,7 +158,7 @@ BOOL CALLBACK DlgProc(HWND hDlg, UINT uMsg, WPARAM wParam, LPARAM lParam)
 			WaitForSingleObject(hLoginReadEvent, INFINITE); // 읽기 완료 기다리기
 			GetDlgItemText(hDlg, EditIP, multicastIP, BUFSIZE + 1);
 			GetDlgItemText(hDlg, EditPORT, multicastPort, BUFSIZE + 1);
-			GetDlgItemText(hDlg, EditName, name, 10);
+			GetDlgItemText(hDlg, EditName, name, NAMESIZE+1);
 			SetEvent(hLoginWriteEvent);					   // 쓰기 완료 알리기
 			SetFocus(hEditText);
 			SendMessage(hEditIP, EM_SETSEL, 0, -1);
@@ -190,6 +190,7 @@ BOOL CALLBACK DlgProc(HWND hDlg, UINT uMsg, WPARAM wParam, LPARAM lParam)
 			//twiceCheck = true;
 			return  TRUE;
 		case ID_NICKCHANGE:
+			GetDlgItemText(hDlg, EditName, name, NAMESIZE + 1);
 			break;
 
 		case IDSEND:
@@ -271,21 +272,36 @@ DWORD WINAPI Receiver(LPVOID arg)
 	// 데이터 통신에 사용할 변수
 	SOCKADDR_IN peeraddr;
 	int addrlen;
+	char nameBuf[NAMESIZE + 1];
+	char idBuf[IDSIZE + 1];
 	char buf[BUFSIZE + 1];
-	char name[10];
 	// 멀티캐스트 데이터 받기
 	while (1) {
 		// 데이터 받기
 		addrlen = sizeof(peeraddr);
 
-		retval = recvfrom(receiveSock, name, 10, 0,
+		// 닉네임 받기
+		retval = recvfrom(receiveSock, nameBuf, NAMESIZE, 0,
 			(SOCKADDR *)&peeraddr, &addrlen);
 		if (retval == SOCKET_ERROR) {
 			err_display("recvfrom()");
 			continue;
 		}
-		name[retval] = '\0';
-		
+		nameBuf[retval] = '\0';
+		//235.7.8.10
+
+		// ID 받기
+		retval = recvfrom(receiveSock, idBuf, IDSIZE, 0,
+			(SOCKADDR *)&peeraddr, &addrlen);
+		if (retval == SOCKET_ERROR) {
+			err_display("recvfrom()");
+			continue;
+		}
+		idBuf[retval] = '\0';
+
+		if(!strcmp(nameBuf,name) && strcmp(idBuf,userIDString))
+			MessageBox(hSendButton, nameBuf, "메시지 박스", MB_ICONERROR | MB_OK);
+
 		retval = recvfrom(receiveSock, buf, BUFSIZE, 0,
 			(SOCKADDR *)&peeraddr, &addrlen);
 		if (retval == SOCKET_ERROR) {
@@ -297,7 +313,7 @@ DWORD WINAPI Receiver(LPVOID arg)
 		buf[retval] = '\0';
 		//printf("\n[UDP/%s:%d] %s\n", inet_ntoa(peeraddr.sin_addr), 
 		//	ntohs(peeraddr.sin_port), buf);
-		DisplayText("%s ", name);
+		DisplayText("%s ", nameBuf);
 		DisplayText("[%s:%d] : %s\n", inet_ntoa(peeraddr.sin_addr), ntohs(peeraddr.sin_port), buf);
 	}
 
@@ -354,7 +370,7 @@ DWORD WINAPI ClientMain(LPVOID arg)
 	// 데이터 통신에 사용할 변수
 	int len;
 	HANDLE hThread;
-
+	
 	//리시버 스레드 생성
 	hThread = CreateThread(NULL, 0, Receiver,
 		(LPVOID)sock, 0, NULL);
@@ -371,8 +387,16 @@ DWORD WINAPI ClientMain(LPVOID arg)
 			continue;
 		}
 
-		// 데이터 보내기
+		// NickName 보내기
 		retval = sendto(sock, name, strlen(name), 0,
+			(SOCKADDR *)&remoteaddr, sizeof(remoteaddr));
+		if (retval == SOCKET_ERROR) {
+			err_display("sendto()");
+			continue;
+		}
+
+		// ID 보내기
+		retval = sendto(sock, userIDString, strlen(userIDString), 0,
 			(SOCKADDR *)&remoteaddr, sizeof(remoteaddr));
 		if (retval == SOCKET_ERROR) {
 			err_display("sendto()");
