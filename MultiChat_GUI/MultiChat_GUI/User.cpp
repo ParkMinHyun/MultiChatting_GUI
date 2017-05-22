@@ -145,8 +145,8 @@ BOOL CALLBACK DlgProc(HWND hDlg, UINT uMsg, WPARAM wParam, LPARAM lParam)
 		hEditName = GetDlgItem(hDlg, EditName);
 		hShowText = GetDlgItem(hDlg, ShowText);
 		hChangeNick = GetDlgItem(hDlg, ID_NICKCHANGE);
-		hSendButton = GetDlgItem(hDlg, IDOK);
-		hLoginButton = GetDlgItem(hDlg, IDSEND);
+		hSendButton = GetDlgItem(hDlg, IDSEND);
+		hLoginButton = GetDlgItem(hDlg, IDOK);
 		hExitButton = GetDlgItem(hDlg, IDCANCEL);
 		SendMessage(hEditText, EM_SETLIMITTEXT, BUFSIZE, 0);
 #pragma endregion
@@ -211,17 +211,12 @@ BOOL CALLBACK DlgProc(HWND hDlg, UINT uMsg, WPARAM wParam, LPARAM lParam)
 
 		case IDSEND:
 			WaitForSingleObject(hReadEvent, INFINITE); // 읽기 완료 기다리기
+			GetDlgItemText(hDlg, EditName, name, BUFSIZE + 1);
 			GetDlgItemText(hDlg, EditText, buf, BUFSIZE + 1);
-			/*GetDlgItemText(hDlg, EditIP, multicastIP, 16);
-			MessageBox(hSendButton, multicastIP, "메시지 박스", MB_ICONERROR | MB_OK);*/
 
 			SetEvent(hWriteEvent);					   // 쓰기 완료 알리기
 			SendMessage(hEditText, EM_SETSEL, 0, -1);
-			//MessageBox(hSendButton, "마우스 왼쪽 버튼을 눌렀습니다", "메시지 박스", MB_ICONERROR | MB_OK);
-/*
-			for(int i=0; i<numberOfpeople; i++)
-				MessageBox(hSendButton, user[i].nickName, "메시지 박스", MB_ICONERROR | MB_OK);
-*/
+
 			return TRUE;
 
 		case IDCANCEL:
