@@ -29,9 +29,9 @@ void err_display(char *msg);
 int recvn(SOCKET s, char *buf, int len, int flags);
 // 소켓 통신 스레드 함수
 DWORD WINAPI ClientMain(LPVOID arg);
-#pragma endregion
 bool checkClassDIP(char *ip);
 bool checkPort(char inputPort[]);
+#pragma endregion
 #pragma region Variable Declare
 SOCKET sock; // 소켓
 SOCKET receiveSock; // 소켓
@@ -40,14 +40,8 @@ SOCKADDR_IN remoteaddr;  //소켓 구조체
 char buf[BUFSIZE + 1];	   // 데이터 송수신 버퍼
 HANDLE hReadEvent, hWriteEvent; // 전송이벤트
 HANDLE hLoginReadEvent, hLoginWriteEvent; // 로그인이벤트
-HWND hSendButton;    // 보내기 버튼
-HWND hIPCheckButton;
-HWND hPortCheckButton;
-HWND hChangeNick;    // 닉네임 바꾸기 버튼
-HWND hLoginButton;   // 접속 버튼
-HWND hExitButton;    // 나가기 버튼
-HWND hResisterNick;  // 닉네임 확인 버튼
-HWND hEditIP, hEditPort, hEditText, hShowText, hEditName; // 편집 컨트롤
+HWND hSendButton, hIPCheckButton, hPortCheckButton, hChangeNick, hLoginButton, hExitButton, hResisterNick,
+     hEditIP, hEditPort, hEditText, hShowText, hEditName; // 편집 컨트롤
 #pragma endregion
 
 bool IPcheck = false, Portcheck = false, NameCheck = false, LoginCheck = false;
@@ -55,6 +49,8 @@ char oldName[NAMESIZE];
 char name[NAMESIZE];
 char userIDString[IDSIZE];
 int userID;
+
+int option = 0;
 
 void err_quit(char *msg)
 {
@@ -97,7 +93,6 @@ int recvn(SOCKET s, char *buf, int len, int flags)
 
 	return (len - left);
 }
-
 
 int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance,
 	LPSTR lpCmdLine, int nCmdShow)
@@ -156,7 +151,6 @@ BOOL CALLBACK DlgProc(HWND hDlg, UINT uMsg, WPARAM wParam, LPARAM lParam)
 		hSendButton = GetDlgItem(hDlg, IDSEND);
 		hLoginButton = GetDlgItem(hDlg, IDOK);
 		hExitButton = GetDlgItem(hDlg, IDCANCEL);
-		SendMessage(hEditText, EM_SETLIMITTEXT, BUFSIZE, 0);
 #pragma endregion
 		return TRUE;
 	case WM_COMMAND:
@@ -206,14 +200,11 @@ BOOL CALLBACK DlgProc(HWND hDlg, UINT uMsg, WPARAM wParam, LPARAM lParam)
 			}
 			EnableWindow(hLoginButton, FALSE); //접속 컨트롤 비활성화
 			WaitForSingleObject(hLoginReadEvent, INFINITE); // 읽기 완료 기다리기
-		
+
 			GetDlgItemText(hDlg, EditName, name, NAMESIZE + 1);
 
 			SetEvent(hLoginWriteEvent);					   // 쓰기 완료 알리기
 			SetFocus(hEditText);
-			SendMessage(hEditName, EM_SETSEL, 0, -1);
-			SendMessage(hEditIP, EM_SETSEL, 0, -1);
-			SendMessage(hEditPort, EM_SETSEL, 0, -1);
 			LoginCheck = true;
 			//if (twiceCheck == true) {
 			//	int retval;
@@ -236,7 +227,7 @@ BOOL CALLBACK DlgProc(HWND hDlg, UINT uMsg, WPARAM wParam, LPARAM lParam)
 			//}
 			//twiceCheck = true;
 			return  TRUE;
-		
+
 		case ID_NICKCHANGE:
 			strcpy(oldName, name);
 			GetDlgItemText(hDlg, EditName, name, NAMESIZE + 1);
@@ -251,7 +242,6 @@ BOOL CALLBACK DlgProc(HWND hDlg, UINT uMsg, WPARAM wParam, LPARAM lParam)
 			WaitForSingleObject(hReadEvent, INFINITE); // 읽기 완료 기다리기
 			GetDlgItemText(hDlg, EditText, buf, BUFSIZE + 1);
 			SetEvent(hWriteEvent);					   // 쓰기 완료 알리기
-			SendMessage(hEditText, EM_SETSEL, 0, -1);
 
 			return TRUE;
 		case IDCANCEL:
@@ -318,53 +308,38 @@ DWORD WINAPI Receiver(LPVOID arg)
 	// 데이터 통신에 사용할 변수
 	SOCKADDR_IN peeraddr;
 	int addrlen;
-	char nameBuf[NAMESIZE + 1];
-	char idBuf[IDSIZE + 1];
-	char buf[BUFSIZE + 1];
+	char receiveBuf[BUFSIZE + 1];
+	char tempBuf[BUFSIZE + 1];
+	char tempBuf2[BUFSIZE + 1];
+	char *strArr[3] = { NULL };
 	// 멀티캐스트 데이터 받기
 	while (1) {
 		// 데이터 받기
 		addrlen = sizeof(peeraddr);
 
-		// 닉네임 받기
-		retval = recvfrom(receiveSock, nameBuf, NAMESIZE, 0,
+		retval = recvfrom(receiveSock, receiveBuf, BUFSIZE, 0,
 			(SOCKADDR *)&peeraddr, &addrlen);
 		if (retval == SOCKET_ERROR) {
 			err_display("recvfrom()");
 			continue;
 		}
-		nameBuf[retval] = '\0';
-		//235.7.8.10
-
-		// ID 받기
-		retval = recvfrom(receiveSock, idBuf, IDSIZE, 0,
-			(SOCKADDR *)&peeraddr, &addrlen);
-		if (retval == SOCKET_ERROR) {
-			err_display("recvfrom()");
-			continue;
-		}
-		idBuf[retval] = '\0';
-
-		if (!strcmp(nameBuf, name) && strcmp(idBuf, userIDString)) {
-			MessageBox(hSendButton, nameBuf, "메시지 박스", MB_ICONERROR | MB_OK);
-		}
-		retval = recvfrom(receiveSock, buf, BUFSIZE, 0,
-			(SOCKADDR *)&peeraddr, &addrlen);
-		if (retval == SOCKET_ERROR) {
-			err_display("recvfrom()");
-			continue;
-		}
-
-		struct tm t;
-		time_t timer;
-
-		timer = time(NULL);    // 현재 시각을 초 단위로 얻기
-		localtime_s(&t, &timer); // 초 단위의 시간을 분리하여 구조체에 넣기
-
 		// 받은 데이터 출력
-		buf[retval] = '\0';
-		DisplayText("%s %d일 %d시 %d분 ", nameBuf, t.tm_mday, t.tm_hour, t.tm_min);
-		DisplayText("[%s] : %s\n", inet_ntoa(peeraddr.sin_addr), buf);
+		receiveBuf[retval] = '\0';
+
+		strncpy(tempBuf, receiveBuf, sizeof(tempBuf));
+
+		char *ptr = strtok(tempBuf, "/");
+		for (int i = 0; i < 3; i++)
+		{
+			strArr[i] = ptr;
+			ptr = strtok(NULL, "/");
+		}
+		strcpy(tempBuf, strArr[0]);
+		sprintf(receiveBuf, "[%s:%d] %s", inet_ntoa(peeraddr.sin_addr), ntohs(peeraddr.sin_port), tempBuf);
+
+		if (!strcmp(strArr[1], name) && strcmp(strArr[2], userIDString)) {
+		}
+		DisplayText("%s\n", receiveBuf);
 	}
 
 	// 멀티캐스트 그룹 탈퇴
@@ -417,8 +392,10 @@ DWORD WINAPI ClientMain(LPVOID arg)
 
 	// 데이터 통신에 사용할 변수
 	int len;
+	char sendBuf[BUFSIZE + 1];
+	char receiveBuf[BUFSIZE + 1];
 	HANDLE hThread;
-
+	
 	//리시버 스레드 생성
 	hThread = CreateThread(NULL, 0, Receiver,
 		(LPVOID)sock, 0, NULL);
@@ -434,31 +411,22 @@ DWORD WINAPI ClientMain(LPVOID arg)
 			SetEvent(hReadEvent); // 읽기 완료 알리기
 			continue;
 		}
+		//235.7.8.10
+		struct tm t;
+		time_t timer;
 
-		// NickName 보내기
-		retval = sendto(sock, name, strlen(name), 0,
-			(SOCKADDR *)&remoteaddr, sizeof(remoteaddr));
-		if (retval == SOCKET_ERROR) {
-			err_display("sendto()");
-			continue;
-		}
+		timer = time(NULL);    // 현재 시각을 초 단위로 얻기
+		localtime_s(&t, &timer); // 초 단위의 시간을 분리하여 구조체에 넣기
 
-		// ID 보내기
-		retval = sendto(sock, userIDString, strlen(userIDString), 0,
-			(SOCKADDR *)&remoteaddr, sizeof(remoteaddr));
-		if (retval == SOCKET_ERROR) {
-			err_display("sendto()");
-			continue;
-		}
+		sprintf(sendBuf, "[%s] %d:%d:%d : %s/%s/%s", name, t.tm_mday, t.tm_hour, t.tm_min, buf, name, userIDString);
 
 		// 데이터 보내기
-		retval = sendto(sock, buf, strlen(buf), 0,
+		retval = sendto(sock, sendBuf, strlen(sendBuf), 0,
 			(SOCKADDR *)&remoteaddr, sizeof(remoteaddr));
 		if (retval == SOCKET_ERROR) {
 			err_display("sendto()");
 			continue;
 		}
-		//DisplayText("%s\n", buf);
 
 		SetEvent(hReadEvent);			 // 읽기 완료 알리기
 	}
@@ -540,8 +508,6 @@ bool checkClassDIP(char *ip)
 	}
 	return false;
 }
-
-
 bool checkPort(char inputPort[]) {
 	int convertInputPort = atoi(inputPort);
 
