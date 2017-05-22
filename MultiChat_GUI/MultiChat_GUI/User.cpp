@@ -41,13 +41,17 @@ char buf[BUFSIZE + 1];	   // 데이터 송수신 버퍼
 HANDLE hReadEvent, hWriteEvent; // 전송이벤트
 HANDLE hLoginReadEvent, hLoginWriteEvent; // 로그인이벤트
 HWND hSendButton;    // 보내기 버튼
+HWND hIPCheckButton;
+HWND hPortCheckButton;
 HWND hChangeNick;    // 닉네임 바꾸기 버튼
 HWND hLoginButton;   // 접속 버튼
 HWND hExitButton;    // 나가기 버튼
+HWND hResisterNick;  // 닉네임 확인 버튼
 HWND hEditIP, hEditPort, hEditText, hShowText, hEditName; // 편집 컨트롤
 #pragma endregion
 
-bool IPcheck = false, Portcheck = false, NameCheck = false;;
+bool IPcheck = false, Portcheck = false, NameCheck = false, LoginCheck = false;
+char oldName[NAMESIZE];
 char name[NAMESIZE];
 char userIDString[IDSIZE];
 int userID;
@@ -145,7 +149,10 @@ BOOL CALLBACK DlgProc(HWND hDlg, UINT uMsg, WPARAM wParam, LPARAM lParam)
 		hEditText = GetDlgItem(hDlg, EditText);
 		hEditName = GetDlgItem(hDlg, EditName);
 		hShowText = GetDlgItem(hDlg, ShowText);
+		hResisterNick = GetDlgItem(hDlg, IDNICKNAME);
 		hChangeNick = GetDlgItem(hDlg, ID_NICKCHANGE);
+		hIPCheckButton = GetDlgItem(hDlg, IDIPCHECK);
+		hPortCheckButton = GetDlgItem(hDlg, IDPORTCHECK);
 		hSendButton = GetDlgItem(hDlg, IDSEND);
 		hLoginButton = GetDlgItem(hDlg, IDOK);
 		hExitButton = GetDlgItem(hDlg, IDCANCEL);
@@ -162,6 +169,7 @@ BOOL CALLBACK DlgProc(HWND hDlg, UINT uMsg, WPARAM wParam, LPARAM lParam)
 				SetFocus(hEditIP);
 				return TRUE;
 			}
+			EnableWindow(hIPCheckButton, FALSE); //주소 편집 버튼 비활성화
 			EnableWindow(hEditIP, FALSE); //주소 편집 컨트롤 비활성화
 			IPcheck = true;
 			return TRUE;
@@ -173,6 +181,8 @@ BOOL CALLBACK DlgProc(HWND hDlg, UINT uMsg, WPARAM wParam, LPARAM lParam)
 				SetFocus(hEditIP);
 				return TRUE;
 			}
+			//235.7.8.10
+			EnableWindow(hPortCheckButton, FALSE); //포트 편집 버튼 비활성화
 			EnableWindow(hEditPort, FALSE); //포트 편집 컨트롤 비활성화
 			Portcheck = true;
 			return TRUE;
@@ -180,6 +190,8 @@ BOOL CALLBACK DlgProc(HWND hDlg, UINT uMsg, WPARAM wParam, LPARAM lParam)
 		case IDNICKNAME:
 			GetDlgItemText(hDlg, EditName, name, NAMESIZE + 1);
 			NameCheck = true;
+			EnableWindow(hResisterNick, FALSE); //접속 컨트롤 비활성화
+			return TRUE;
 
 		case IDOK:
 			if (IPcheck == false || Portcheck == false) {
@@ -202,6 +214,7 @@ BOOL CALLBACK DlgProc(HWND hDlg, UINT uMsg, WPARAM wParam, LPARAM lParam)
 			SendMessage(hEditName, EM_SETSEL, 0, -1);
 			SendMessage(hEditIP, EM_SETSEL, 0, -1);
 			SendMessage(hEditPort, EM_SETSEL, 0, -1);
+			LoginCheck = true;
 			//if (twiceCheck == true) {
 			//	int retval;
 			//	// 멀티캐스트 그룹 탈퇴
@@ -223,11 +236,18 @@ BOOL CALLBACK DlgProc(HWND hDlg, UINT uMsg, WPARAM wParam, LPARAM lParam)
 			//}
 			//twiceCheck = true;
 			return  TRUE;
+		
 		case ID_NICKCHANGE:
+			strcpy(oldName, name);
 			GetDlgItemText(hDlg, EditName, name, NAMESIZE + 1);
+			DisplayText("%s에서 %d으로 NickName을 변경하였습니다.\n", oldName, name);
 			break;
 
 		case IDSEND:
+			if (LoginCheck == false) {
+				MessageBox(hDlg, "접속을 먼저 해주세요", "접속 불가", MB_OK);
+				return TRUE;
+			}
 			WaitForSingleObject(hReadEvent, INFINITE); // 읽기 완료 기다리기
 			GetDlgItemText(hDlg, EditText, buf, BUFSIZE + 1);
 			SetEvent(hWriteEvent);					   // 쓰기 완료 알리기
