@@ -30,7 +30,7 @@ int recvn(SOCKET s, char *buf, int len, int flags);
 // 소켓 통신 스레드 함수
 DWORD WINAPI ClientMain(LPVOID arg);
 #pragma endregion
-bool checkClassDIP(char inputIP[]);
+bool checkClassDIP(char *ip);
 bool checkPort(char inputPort[]);
 #pragma region Variable Declare
 SOCKET sock; // 소켓
@@ -45,9 +45,9 @@ HWND hChangeNick;    // 닉네임 바꾸기 버튼
 HWND hLoginButton;   // 접속 버튼
 HWND hExitButton;    // 나가기 버튼
 HWND hEditIP, hEditPort, hEditText, hShowText, hEditName; // 편집 컨트롤
-bool twiceCheck = false;
 #pragma endregion
 
+bool IPcheck = false, Portcheck = false, NameCheck = false;;
 char name[NAMESIZE];
 char userIDString[IDSIZE];
 int userID;
@@ -115,7 +115,8 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance,
 	hLoginWriteEvent = CreateEvent(NULL, FALSE, FALSE, NULL);
 	if (hLoginWriteEvent == NULL) return 1;
 
-	
+	// 소켓 통신 스레드 생성
+	CreateThread(NULL, 0, ClientMain, NULL, 0, NULL);
 	// 대화상자 생성
 	DialogBox(hInstance, MAKEINTRESOURCE(IDD_DIALOG1), NULL, DlgProc);
 
@@ -153,28 +154,48 @@ BOOL CALLBACK DlgProc(HWND hDlg, UINT uMsg, WPARAM wParam, LPARAM lParam)
 		return TRUE;
 	case WM_COMMAND:
 		switch (LOWORD(wParam)) {
-
-		case IDOK:
-			WaitForSingleObject(hLoginReadEvent, INFINITE); // 읽기 완료 기다리기
+		case IDIPCHECK:
 			GetDlgItemText(hDlg, EditIP, multicastIP, BUFSIZE + 1);
-
 			if (checkClassDIP(multicastIP) == false)
 			{
-				MessageBox(hDlg, "ClassD주소만 입력하세요", "IP오류", MB_OK);
+				MessageBox(hDlg, "오직 올바른 ClassD주소만 입력할 수 있습니다", "IP오류", MB_OK);
 				SetFocus(hEditIP);
-				return FALSE;
+				return TRUE;
 			}
+			EnableWindow(hEditIP, FALSE); //주소 편집 컨트롤 비활성화
+			IPcheck = true;
+			return TRUE;
+		case IDPORTCHECK:
 			GetDlgItemText(hDlg, EditPORT, multicastPort, BUFSIZE + 1);
 			if (checkPort(multicastPort) == false)
 			{
 				MessageBox(hDlg, "올바른 Port번호만 입력하세요", "Port오류", MB_OK);
 				SetFocus(hEditIP);
-				return FALSE;
+				return TRUE;
 			}
-			GetDlgItemText(hDlg, EditName, name, NAMESIZE + 1);
-			// 소켓 통신 스레드 생성
-			CreateThread(NULL, 0, ClientMain, NULL, 0, NULL);
+			EnableWindow(hEditPort, FALSE); //포트 편집 컨트롤 비활성화
+			Portcheck = true;
+			return TRUE;
 
+		case IDNICKNAME:
+			GetDlgItemText(hDlg, EditName, name, NAMESIZE + 1);
+			NameCheck = true;
+
+		case IDOK:
+			if (IPcheck == false || Portcheck == false) {
+				MessageBox(hDlg, "IP또는 Port를 체크하세요", "접속 불가", MB_OK);
+				SetFocus(hEditIP);
+				return TRUE;
+			}
+			if (NameCheck == false) {
+				MessageBox(hDlg, "Name 체크를 해주세요", "접속 불가", MB_OK);
+				SetFocus(hEditName);
+				return TRUE;
+			}
+			EnableWindow(hLoginButton, FALSE); //접속 컨트롤 비활성화
+			WaitForSingleObject(hLoginReadEvent, INFINITE); // 읽기 완료 기다리기
+		
+			GetDlgItemText(hDlg, EditName, name, NAMESIZE + 1);
 
 			SetEvent(hLoginWriteEvent);					   // 쓰기 완료 알리기
 			SetFocus(hEditText);
@@ -187,20 +208,17 @@ BOOL CALLBACK DlgProc(HWND hDlg, UINT uMsg, WPARAM wParam, LPARAM lParam)
 			//    retval = setsockopt(receiveSock, IPPROTO_IP, IP_DROP_MEMBERSHIP,
 			//		(char *)&mreq, sizeof(mreq));
 			//	if (retval == SOCKET_ERROR) err_quit("setsockopt()");
-
 			//	// 소켓 주소 구조체 초기화
 			//	ZeroMemory(&remoteaddr, sizeof(remoteaddr));
 			//	remoteaddr.sin_family = AF_INET;
 			//	remoteaddr.sin_addr.s_addr = inet_addr("235.7.8.9");
 			//	remoteaddr.sin_port = htons(atoi(multicastPort));
-
 			//	// 멀티캐스트 그룹 가입
 			//	mreq.imr_multiaddr.s_addr = inet_addr("235.7.8.9");
 			//	mreq.imr_interface.s_addr = htonl(INADDR_ANY);
 			//	retval = setsockopt(receiveSock, IPPROTO_IP, IP_ADD_MEMBERSHIP,
 			//		(char *)&mreq, sizeof(mreq));
 			//	if (retval == SOCKET_ERROR) err_quit("setsockopt()");
-
 			//	twiceCheck = false;
 			//}
 			//twiceCheck = true;
@@ -211,14 +229,11 @@ BOOL CALLBACK DlgProc(HWND hDlg, UINT uMsg, WPARAM wParam, LPARAM lParam)
 
 		case IDSEND:
 			WaitForSingleObject(hReadEvent, INFINITE); // 읽기 완료 기다리기
-			GetDlgItemText(hDlg, EditName, name, BUFSIZE + 1);
 			GetDlgItemText(hDlg, EditText, buf, BUFSIZE + 1);
-
 			SetEvent(hWriteEvent);					   // 쓰기 완료 알리기
 			SendMessage(hEditText, EM_SETSEL, 0, -1);
 
 			return TRUE;
-
 		case IDCANCEL:
 			EndDialog(hDlg, IDCANCEL);
 			return TRUE;
@@ -431,20 +446,81 @@ DWORD WINAPI ClientMain(LPVOID arg)
 	return 0;
 }
 
-bool checkClassDIP(char inputIP[])
+bool checkClassDIP(char *ip)
 {
-	char checkClassDIP[3];
-	for (int i = 0; i < 3; i++)
-	{
-		checkClassDIP[i] = inputIP[i];
-	}
-	int convertInputIP = atoi(checkClassDIP);
-	
-	if (convertInputIP >= 224 && convertInputIP < 240)
-		return true;
-	else
+	// 공백 예외처리
+	if (strcmp(ip, " ") == 0)
 		return false;
+
+	// IP 길이 예외처리
+	int len = strlen(ip);
+	if (len > 15 || len < 7)
+		return false;
+
+	int nNumCount = 0;
+	int nDotCount = 0;
+	char checkClassDIP1[3], checkClassDIP2[3], checkClassDIP3[3], checkClassDIP4[3];
+	int i = 0, k = 0;
+
+	for (i = 0; i < len; i++)
+	{
+		// 0~9 아닌 숫자 걸르기
+		if (ip[i] < '0' || ip[i] > '9')
+		{
+			// . 기준으로 IP 분리하기
+			if (ip[i] == '.')
+			{
+				++nDotCount;
+				k = 0;
+				nNumCount = 0;
+			}
+			else
+				return false;
+		}
+		// 올바른 숫자 입력했을 경우 . 기준으로 해당 문자열에 IP 집어 넣기
+		else
+		{
+			if (nDotCount == 0) {
+				checkClassDIP1[k++] = ip[i];
+			}
+			else if (nDotCount == 1) {
+				checkClassDIP2[k++] = ip[i];
+			}
+			else if (nDotCount == 2) {
+				checkClassDIP3[k++] = ip[i];
+			}
+			else if (nDotCount == 3) {
+				checkClassDIP4[k++] = ip[i];
+			}
+			if (++nNumCount > 3)
+				return false;
+		}
+	}
+	// .이 3개 아니면 false
+	if (nDotCount != 3)
+		return false;
+
+	int convertInputIP1 = atoi(checkClassDIP1);
+	int convertInputIP2 = atoi(checkClassDIP2);
+	int convertInputIP3 = atoi(checkClassDIP3);
+	int convertInputIP4 = atoi(checkClassDIP4);
+
+	// class D IP 검사하기
+	if (convertInputIP1 >= 224 && convertInputIP1 < 240) {
+		if (convertInputIP2 >= 0 && convertInputIP2 <= 255) {
+			if (convertInputIP3 >= 0 && convertInputIP3 <= 255) {
+				if (convertInputIP4 >= 0 && convertInputIP4 <= 255) {
+					return true;
+				}
+				return false;
+			}
+			return false;
+		}
+		return false;
+	}
+	return false;
 }
+
 
 bool checkPort(char inputPort[]) {
 	int convertInputPort = atoi(inputPort);
