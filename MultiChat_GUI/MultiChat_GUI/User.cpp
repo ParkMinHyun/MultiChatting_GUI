@@ -7,7 +7,7 @@
 #include <string.h>
 #include <stdio.h>
 #include "resource.h"
-
+//235.7.8.10
 #define BUFSIZE  512
 #define NAMESIZE 10
 #define IDSIZE 10
@@ -43,23 +43,16 @@ HANDLE hLoginReadEvent, hLoginWriteEvent; // 로그인이벤트
 HWND hSendButton, hIPCheckButton, hPortCheckButton, hChangeNick, hLoginButton, hExitButton, hResisterNick,
 hEditIP, hEditPort, hEditText, hShowText, hEditName; // 편집 컨트롤
 
-
 bool ipCheck = false, portCheck = false, nameCheck = false, loginCheck = false, registerNameCheck = false;
 char oldName[NAMESIZE];		// User 구닉네임
 char name[NAMESIZE];		// User 닉네임
 char userIDString[IDSIZE];	// UserID 스트링
 int userID;		// UserID
+bool loginNameCheck = false; // 처음 로그인할 때 구분하는 변수
+int oneToOneComm = 0;        // 1:1 통신을 구분하기 위한 변수 
 struct tm t;	// 타이머 구조체
 time_t timer;	// 타이머 
 #pragma endregion
-
-
-// 처음 로그인할 때 구분하는 변수
-bool loginNameCheck = false;
-// 중복 닉네임 검출
-bool dupNameCheck = false;
-// 1:1 통신을 구분하기 위한 변수
-int oneToOneComm = 0;
 
 void err_quit(char *msg)
 {
@@ -176,6 +169,7 @@ BOOL CALLBACK DlgProc(HWND hDlg, UINT uMsg, WPARAM wParam, LPARAM lParam)
 			EnableWindow(hEditIP, FALSE); //주소 편집 컨트롤 비활성화
 			ipCheck = true;
 			return TRUE;
+
 		case IDPORTCHECK:
 			GetDlgItemText(hDlg, EditPORT, multicastPort, BUFSIZE + 1);
 			if (checkPort(multicastPort) == false)
@@ -208,8 +202,7 @@ BOOL CALLBACK DlgProc(HWND hDlg, UINT uMsg, WPARAM wParam, LPARAM lParam)
 				SetFocus(hEditName);
 				return TRUE;
 			}
-			DisplayText("%s\n", userIDString);
-			EnableWindow(hLoginButton, FALSE); //접속 컨트롤 비활성화
+			EnableWindow(hLoginButton, FALSE);				//접속 컨트롤 비활성화
 			WaitForSingleObject(hLoginReadEvent, INFINITE); // 읽기 완료 기다리기
 
 			GetDlgItemText(hDlg, EditName, name, NAMESIZE + 1);
@@ -220,7 +213,6 @@ BOOL CALLBACK DlgProc(HWND hDlg, UINT uMsg, WPARAM wParam, LPARAM lParam)
 			// Login에 대한 Buf 내용 전송
 			loginCheck = true;
 			sprintf(buf, "%s/%s/%s", LOGIN, name, userIDString);
-			//sprintf(buf, "%s/%s/%s/%s/", LOGIN, name, userIDString, "님이 채팅방에 접속했습니다.");
 			SetEvent(hWriteEvent);					   // 쓰기 완료 알리기
 			WaitForSingleObject(hReadEvent, INFINITE); // 읽기 완료 기다리기
 
@@ -236,7 +228,12 @@ BOOL CALLBACK DlgProc(HWND hDlg, UINT uMsg, WPARAM wParam, LPARAM lParam)
 			if (!strcmp(oldName, name)) {
 				break;
 			}
-			DisplayText("%s에서 %s으로 NickName을 변경하였습니다.\n", oldName, name);
+
+			timer = time(NULL);    // 현재 시각을 초 단위로 얻기
+			localtime_s(&t, &timer); // 초 단위의 시간을 분리하여 구조체에 넣기
+
+			DisplayText("(%d일 %d시 %d분) %s에서 %s으로 NickName을 변경하였습니다.\n",
+				t.tm_mday, t.tm_hour, t.tm_min, oldName, name );
 			sprintf(buf, "%s", CHANGENAME);
 			if (oneToOneComm == 0)
 				break;
@@ -389,13 +386,12 @@ DWORD WINAPI Receiver(LPVOID arg)
 				sprintf(buf, "%s@", splitBuf[2]);
 				WaitForSingleObject(hReadEvent, INFINITE); // 읽기 완료 기다리기
 				SetEvent(hWriteEvent);					   // 쓰기 완료 알리기
-				//DisplayText("%s님이 +1 했습니다. \n", splitBuf[1]);
 			}
 			DisplayText("%s\n", receiveBuf);
 			continue;
 		}
 
-		// 3. 같은 Status 상태의 Client간 통신 구현
+		// 2. 같은 Status 상태의 Client간 통신 구현
 		char status[1];
 		itoa(oneToOneComm, status, 10);
 		if (splitBuf[2] == NULL) {
@@ -404,7 +400,6 @@ DWORD WINAPI Receiver(LPVOID arg)
 		if (!strcmp(splitBuf[3], status)) {
 			sprintf(receiveBuf, "[%s:%d] %s", inet_ntoa(peeraddr.sin_addr), ntohs(peeraddr.sin_port), tempBuf);
 			DisplayText("%s\n", receiveBuf);
-			//DisplayText("%s : %s\n", receiveBuf, status);
 		}
 	}
 
@@ -459,7 +454,6 @@ DWORD WINAPI ClientMain(LPVOID arg)
 	// 데이터 통신에 사용할 변수
 	int len;
 	char sendBuf[BUFSIZE + 1];
-	char tempBuf[BUFSIZE + 1];
 	HANDLE hThread;
 
 	//리시버 스레드 생성
@@ -485,8 +479,7 @@ DWORD WINAPI ClientMain(LPVOID arg)
 			sprintf(sendBuf, "%s", buf);
 		}
 		else {
-			//235.7.8.10
-
+			
 			timer = time(NULL);    // 현재 시각을 초 단위로 얻기
 			localtime_s(&t, &timer); // 초 단위의 시간을 분리하여 구조체에 넣기
 
@@ -498,7 +491,7 @@ DWORD WINAPI ClientMain(LPVOID arg)
 				sprintf(sendBuf, buf);
 			}
 			else {
-				sprintf(sendBuf, "[%s] %d일%d시%d분 : %s/%s/%s/%d", name, t.tm_mday, t.tm_hour, t.tm_min, buf, name, userIDString, oneToOneComm);
+				sprintf(sendBuf, "[%s] (%d일%d시%d분) : %s/%s/%s/%d", name, t.tm_mday, t.tm_hour, t.tm_min, buf, name, userIDString, oneToOneComm);
 			}
 		}
 		// 데이터 보내기
