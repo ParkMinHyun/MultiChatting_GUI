@@ -42,13 +42,17 @@ HANDLE hReadEvent, hWriteEvent; // 전송이벤트
 HANDLE hLoginReadEvent, hLoginWriteEvent; // 로그인이벤트
 HWND hSendButton, hIPCheckButton, hPortCheckButton, hChangeNick, hLoginButton, hExitButton, hResisterNick,
 hEditIP, hEditPort, hEditText, hShowText, hEditName; // 편집 컨트롤
+
+
+bool ipCheck = false, portCheck = false, nameCheck = false, loginCheck = false, registerNameCheck = false;
+char oldName[NAMESIZE];		// User 구닉네임
+char name[NAMESIZE];		// User 닉네임
+char userIDString[IDSIZE];	// UserID 스트링
+int userID;		// UserID
+struct tm t;	// 타이머 구조체
+time_t timer;	// 타이머 
 #pragma endregion
 
-bool IPcheck = false, Portcheck = false, NameCheck = false, LoginCheck = false;
-char oldName[NAMESIZE];
-char name[NAMESIZE];
-char userIDString[IDSIZE];
-int userID;
 
 // 처음 로그인할 때 구분하는 변수
 bool loginNameCheck = false;
@@ -170,7 +174,7 @@ BOOL CALLBACK DlgProc(HWND hDlg, UINT uMsg, WPARAM wParam, LPARAM lParam)
 			}
 			EnableWindow(hIPCheckButton, FALSE); //주소 편집 버튼 비활성화
 			EnableWindow(hEditIP, FALSE); //주소 편집 컨트롤 비활성화
-			IPcheck = true;
+			ipCheck = true;
 			return TRUE;
 		case IDPORTCHECK:
 			GetDlgItemText(hDlg, EditPORT, multicastPort, BUFSIZE + 1);
@@ -183,22 +187,23 @@ BOOL CALLBACK DlgProc(HWND hDlg, UINT uMsg, WPARAM wParam, LPARAM lParam)
 			//235.7.8.10
 			EnableWindow(hPortCheckButton, FALSE); //포트 편집 버튼 비활성화
 			EnableWindow(hEditPort, FALSE); //포트 편집 컨트롤 비활성화
-			Portcheck = true;
+			portCheck = true;
 			return TRUE;
 
 		case IDNICKNAME:
 			GetDlgItemText(hDlg, EditName, name, NAMESIZE + 1);
-			NameCheck = true;
+			nameCheck = true;
 			EnableWindow(hResisterNick, FALSE); //접속 컨트롤 비활성화
+			registerNameCheck = true;
 			return TRUE;
 
 		case IDOK:
-			if (IPcheck == false || Portcheck == false) {
+			if (ipCheck == false || portCheck == false) {
 				MessageBox(hDlg, "IP또는 Port를 체크하세요", "접속 불가", MB_OK);
 				SetFocus(hEditIP);
 				return TRUE;
 			}
-			if (NameCheck == false) {
+			if (nameCheck == false) {
 				MessageBox(hDlg, "Name 체크를 해주세요", "접속 불가", MB_OK);
 				SetFocus(hEditName);
 				return TRUE;
@@ -213,7 +218,7 @@ BOOL CALLBACK DlgProc(HWND hDlg, UINT uMsg, WPARAM wParam, LPARAM lParam)
 			SetFocus(hEditText);
 
 			// Login에 대한 Buf 내용 전송
-			LoginCheck = true;
+			loginCheck = true;
 			sprintf(buf, "%s/%s/%s", LOGIN, name, userIDString);
 			//sprintf(buf, "%s/%s/%s/%s/", LOGIN, name, userIDString, "님이 채팅방에 접속했습니다.");
 			SetEvent(hWriteEvent);					   // 쓰기 완료 알리기
@@ -222,7 +227,10 @@ BOOL CALLBACK DlgProc(HWND hDlg, UINT uMsg, WPARAM wParam, LPARAM lParam)
 			return  TRUE;
 
 		case ID_NICKCHANGE:
-			//loginNameCheck = false;
+
+			if (registerNameCheck == false)
+				break;
+
 			strcpy(oldName, name);
 			GetDlgItemText(hDlg, EditName, name, NAMESIZE + 1);
 			if (!strcmp(oldName, name)) {
@@ -239,7 +247,7 @@ BOOL CALLBACK DlgProc(HWND hDlg, UINT uMsg, WPARAM wParam, LPARAM lParam)
 			break;
 
 		case IDSEND:
-			if (LoginCheck == false) {
+			if (loginCheck == false) {
 				MessageBox(hDlg, "접속을 먼저 해주세요", "접속 불가", MB_OK);
 				return TRUE;
 			}
@@ -316,9 +324,7 @@ DWORD WINAPI Receiver(LPVOID arg)
 	int addrlen;
 	char receiveBuf[BUFSIZE + 1];
 	char tempBuf[BUFSIZE + 1];
-	char tempBuf2[BUFSIZE + 1];
 	char *splitBuf[4] = { NULL };
-	char *splitBuf2[3] = { NULL };
 	// 멀티캐스트 데이터 받기
 	while (1) {
 		// 데이터 받기
@@ -345,12 +351,12 @@ DWORD WINAPI Receiver(LPVOID arg)
 			}
 			continue;
 		}
+
 		// 닉네임 변경시 oneToOneComm 초기화
 		if (!strcmp("!@#$!@#", receiveBuf)) {
 			if (oneToOneComm != 0) {
 				DisplayText("일대일 대화를 종료합니다.\n");
 			}
-				
 			oneToOneComm = 0;
 			continue;
 		}
@@ -371,14 +377,6 @@ DWORD WINAPI Receiver(LPVOID arg)
 			splitChar = strtok(NULL, "/");
 		}
 		strcpy(tempBuf, splitBuf[0]);
-
-		/*if (cnt == 4 && dupNameCheck == false) {
-			if (!strcmp(splitBuf[2], userIDString)) {
-				oneToOneComm = 1;
-				dupNameCheck = true;
-				continue;
-			}
-		}*/
 
 		// 1. User가 로그인했을 경우
 		if (!strcmp(LOGIN, tempBuf)) {
@@ -486,14 +484,7 @@ DWORD WINAPI ClientMain(LPVOID arg)
 
 			sprintf(sendBuf, "%s", buf);
 		}
-		//닉네임 바꾸기버튼 닉네임 등록하기 전엔 선택안되는 예외잡기
-		//닉네임 바꾸기버튼 닉네임 등록하기 전엔 선택안되는 예외잡기
-		//닉네임 바꾸기버튼 닉네임 등록하기 전엔 선택안되는 예외잡기
-		//닉네임 바꾸기버튼 닉네임 등록하기 전엔 선택안되는 예외잡기
-		//닉네임 채인지 예외도
 		else {
-			struct tm t;
-			time_t timer;
 			//235.7.8.10
 
 			timer = time(NULL);    // 현재 시각을 초 단위로 얻기
