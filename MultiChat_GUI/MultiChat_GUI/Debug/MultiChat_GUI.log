@@ -23,24 +23,26 @@ c:\users\parkminhyun\documents\multichatting_gui\multichat_gui\multichat_gui\use
   c:\program files (x86)\windows kits\10\include\10.0.15063.0\ucrt\string.h(439): note: 'strtok' 선언을 참조하십시오.
 c:\users\parkminhyun\documents\multichatting_gui\multichat_gui\multichat_gui\user.cpp(380): warning C4996: 'strcpy': This function or variable may be unsafe. Consider using strcpy_s instead. To disable deprecation, use _CRT_SECURE_NO_WARNINGS. See online help for details.
   c:\program files (x86)\windows kits\10\include\10.0.15063.0\ucrt\string.h(136): note: 'strcpy' 선언을 참조하십시오.
-c:\users\parkminhyun\documents\multichatting_gui\multichat_gui\multichat_gui\user.cpp(384): warning C4996: 'sprintf': This function or variable may be unsafe. Consider using sprintf_s instead. To disable deprecation, use _CRT_SECURE_NO_WARNINGS. See online help for details.
+c:\users\parkminhyun\documents\multichatting_gui\multichat_gui\multichat_gui\user.cpp(385): warning C4996: 'sprintf': This function or variable may be unsafe. Consider using sprintf_s instead. To disable deprecation, use _CRT_SECURE_NO_WARNINGS. See online help for details.
   c:\program files (x86)\windows kits\10\include\10.0.15063.0\ucrt\stdio.h(1772): note: 'sprintf' 선언을 참조하십시오.
-c:\users\parkminhyun\documents\multichatting_gui\multichat_gui\multichat_gui\user.cpp(390): warning C4996: 'sprintf': This function or variable may be unsafe. Consider using sprintf_s instead. To disable deprecation, use _CRT_SECURE_NO_WARNINGS. See online help for details.
+c:\users\parkminhyun\documents\multichatting_gui\multichat_gui\multichat_gui\user.cpp(392): warning C4996: 'sprintf': This function or variable may be unsafe. Consider using sprintf_s instead. To disable deprecation, use _CRT_SECURE_NO_WARNINGS. See online help for details.
   c:\program files (x86)\windows kits\10\include\10.0.15063.0\ucrt\stdio.h(1772): note: 'sprintf' 선언을 참조하십시오.
-c:\users\parkminhyun\documents\multichatting_gui\multichat_gui\multichat_gui\user.cpp(400): warning C4996: 'itoa': The POSIX name for this item is deprecated. Instead, use the ISO C and C++ conformant name: _itoa. See online help for details.
+c:\users\parkminhyun\documents\multichatting_gui\multichat_gui\multichat_gui\user.cpp(402): warning C4996: 'itoa': The POSIX name for this item is deprecated. Instead, use the ISO C and C++ conformant name: _itoa. See online help for details.
   c:\program files (x86)\windows kits\10\include\10.0.15063.0\ucrt\stdlib.h(1334): note: 'itoa' 선언을 참조하십시오.
-c:\users\parkminhyun\documents\multichatting_gui\multichat_gui\multichat_gui\user.cpp(405): warning C4996: 'sprintf': This function or variable may be unsafe. Consider using sprintf_s instead. To disable deprecation, use _CRT_SECURE_NO_WARNINGS. See online help for details.
+c:\users\parkminhyun\documents\multichatting_gui\multichat_gui\multichat_gui\user.cpp(407): warning C4996: 'sprintf': This function or variable may be unsafe. Consider using sprintf_s instead. To disable deprecation, use _CRT_SECURE_NO_WARNINGS. See online help for details.
   c:\program files (x86)\windows kits\10\include\10.0.15063.0\ucrt\stdio.h(1772): note: 'sprintf' 선언을 참조하십시오.
-c:\users\parkminhyun\documents\multichatting_gui\multichat_gui\multichat_gui\user.cpp(451): warning C4996: 'inet_addr': Use inet_pton() or InetPton() instead or define _WINSOCK_DEPRECATED_NO_WARNINGS to disable deprecated API warnings
+c:\users\parkminhyun\documents\multichatting_gui\multichat_gui\multichat_gui\user.cpp(453): warning C4996: 'inet_addr': Use inet_pton() or InetPton() instead or define _WINSOCK_DEPRECATED_NO_WARNINGS to disable deprecated API warnings
   c:\program files (x86)\windows kits\10\include\10.0.15063.0\um\winsock2.h(1830): note: 'inet_addr' 선언을 참조하십시오.
-c:\users\parkminhyun\documents\multichatting_gui\multichat_gui\multichat_gui\user.cpp(483): warning C4996: 'sprintf': This function or variable may be unsafe. Consider using sprintf_s instead. To disable deprecation, use _CRT_SECURE_NO_WARNINGS. See online help for details.
-  c:\program files (x86)\windows kits\10\include\10.0.15063.0\ucrt\stdio.h(1772): note: 'sprintf' 선언을 참조하십시오.
-c:\users\parkminhyun\documents\multichatting_gui\multichat_gui\multichat_gui\user.cpp(492): warning C4996: 'sprintf': This function or variable may be unsafe. Consider using sprintf_s instead. To disable deprecation, use _CRT_SECURE_NO_WARNINGS. See online help for details.
+c:\users\parkminhyun\documents\multichatting_gui\multichat_gui\multichat_gui\user.cpp(485): warning C4996: 'sprintf': This function or variable may be unsafe. Consider using sprintf_s instead. To disable deprecation, use _CRT_SECURE_NO_WARNINGS. See online help for details.
   c:\program files (x86)\windows kits\10\include\10.0.15063.0\ucrt\stdio.h(1772): note: 'sprintf' 선언을 참조하십시오.
 c:\users\parkminhyun\documents\multichatting_gui\multichat_gui\multichat_gui\user.cpp(495): warning C4996: 'sprintf': This function or variable may be unsafe. Consider using sprintf_s instead. To disable deprecation, use _CRT_SECURE_NO_WARNINGS. See online help for details.
   c:\program files (x86)\windows kits\10\include\10.0.15063.0\ucrt\stdio.h(1772): note: 'sprintf' 선언을 참조하십시오.
-c:\users\parkminhyun\documents\multichatting_gui\multichat_gui\multichat_gui\user.cpp(498): warning C4996: 'sprintf': This function or variable may be unsafe. Consider using sprintf_s instead. To disable deprecation, use _CRT_SECURE_NO_WARNINGS. See online help for details.
+c:\users\parkminhyun\documents\multichatting_gui\multichat_gui\multichat_gui\user.cpp(499): warning C4996: 'sprintf': This function or variable may be unsafe. Consider using sprintf_s instead. To disable deprecation, use _CRT_SECURE_NO_WARNINGS. See online help for details.
   c:\program files (x86)\windows kits\10\include\10.0.15063.0\ucrt\stdio.h(1772): note: 'sprintf' 선언을 참조하십시오.
-c:\users\parkminhyun\documents\multichatting_gui\multichat_gui\multichat_gui\user.cpp(459): warning C4101: 'len' :참조되지 않은 지역 변수입니다.
+c:\users\parkminhyun\documents\multichatting_gui\multichat_gui\multichat_gui\user.cpp(503): warning C4996: 'sprintf': This function or variable may be unsafe. Consider using sprintf_s instead. To disable deprecation, use _CRT_SECURE_NO_WARNINGS. See online help for details.
+  c:\program files (x86)\windows kits\10\include\10.0.15063.0\ucrt\stdio.h(1772): note: 'sprintf' 선언을 참조하십시오.
+c:\users\parkminhyun\documents\multichatting_gui\multichat_gui\multichat_gui\user.cpp(507): warning C4996: 'sprintf': This function or variable may be unsafe. Consider using sprintf_s instead. To disable deprecation, use _CRT_SECURE_NO_WARNINGS. See online help for details.
+  c:\program files (x86)\windows kits\10\include\10.0.15063.0\ucrt\stdio.h(1772): note: 'sprintf' 선언을 참조하십시오.
+c:\users\parkminhyun\documents\multichatting_gui\multichat_gui\multichat_gui\user.cpp(461): warning C4101: 'len' :참조되지 않은 지역 변수입니다.
   MultiChat_GUI.vcxproj -> C:\Users\ParkMinHyun\Documents\MultiChatting_GUI\MultiChat_GUI\Debug\MultiChat_GUI.exe
   MultiChat_GUI.vcxproj -> C:\Users\ParkMinHyun\Documents\MultiChatting_GUI\MultiChat_GUI\Debug\MultiChat_GUI.pdb (Partial PDB)

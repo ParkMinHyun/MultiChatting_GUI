@@ -235,13 +235,13 @@ BOOL CALLBACK DlgProc(HWND hDlg, UINT uMsg, WPARAM wParam, LPARAM lParam)
 			localtime_s(&t, &timer); // 초 단위의 시간을 분리하여 구조체에 넣기
 
 			DisplayText("(%d일 %d시 %d분) %s에서 %s으로 NickName을 변경하였습니다.\n",
-				t.tm_mday, t.tm_hour, t.tm_min, oldName, name );
+				t.tm_mday, t.tm_hour, t.tm_min, oldName, name);
 
-			if (oneToOneComm == 1){
+			if (oneToOneComm == 1) {
 				sprintf(buf, "%s", CHANGENAME);
 			}
 			else {
-				sprintf(buf, "%s/%s/%s", LOGIN, name, userIDString);
+				sprintf(buf, "%s/%s/%s/", LOGIN, name, userIDString);
 			}
 			SetEvent(hWriteEvent);					   // 쓰기 완료 알리기
 			WaitForSingleObject(hReadEvent, INFINITE); // 읽기 완료 기다리기
@@ -379,9 +379,11 @@ DWORD WINAPI Receiver(LPVOID arg)
 		}
 		strcpy(tempBuf, splitBuf[0]);
 
-		// 1. User가 로그인했을 경우
+		// 1. User가 로그인했을 경우 or 중복된 NickName으로 바꿨을 경우
 		if (!strcmp(LOGIN, tempBuf)) {
-			sprintf(receiveBuf, "닉네임 %s님이 %s", splitBuf[1], "채팅방에 입장하셨습니다!");
+			if (cnt == 3) {
+				sprintf(receiveBuf, "닉네임 %s님이 %s", splitBuf[1], "채팅방에 입장하셨습니다!");
+			}
 			if (!strcmp(splitBuf[1], name) && strcmp(splitBuf[2], userIDString)) {
 				oneToOneComm = 1;
 
@@ -391,7 +393,8 @@ DWORD WINAPI Receiver(LPVOID arg)
 				WaitForSingleObject(hReadEvent, INFINITE); // 읽기 완료 기다리기
 				SetEvent(hWriteEvent);					   // 쓰기 완료 알리기
 			}
-			DisplayText("%s\n", receiveBuf);
+			if (cnt == 3)
+				DisplayText("%s\n", receiveBuf);
 			continue;
 		}
 
@@ -483,17 +486,24 @@ DWORD WINAPI ClientMain(LPVOID arg)
 			sprintf(sendBuf, "%s", buf);
 		}
 		else {
-			
+
 			timer = time(NULL);    // 현재 시각을 초 단위로 얻기
 			localtime_s(&t, &timer); // 초 단위의 시간을 분리하여 구조체에 넣기
 
 			char *checkBuf = &buf[strlen(buf) - 1];
-			if (!strcmp(checkBuf, "@")) {
+			// oneToOneComm이 0인 상황에서 닉네임을 바꿨을 경우
+			if (!strcmp(checkBuf, "/")) {
 				sprintf(sendBuf, buf);
 			}
+			// 중복된 닉네임의 Client를 검출하기 위한 경우
+			else if (!strcmp(checkBuf, "@")) {
+				sprintf(sendBuf, buf);
+			}
+			// 중복된 상태의 NickName을 바꿨을 경우
 			else if (!strcmp(buf, CHANGENAME)) {
 				sprintf(sendBuf, buf);
 			}
+			// 나머지 모든 상황
 			else {
 				sprintf(sendBuf, "[%s] (%d일%d시%d분) : %s/%s/%s/%d", name, t.tm_mday, t.tm_hour, t.tm_min, buf, name, userIDString, oneToOneComm);
 			}
