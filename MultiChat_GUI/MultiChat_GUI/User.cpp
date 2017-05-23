@@ -225,11 +225,17 @@ BOOL CALLBACK DlgProc(HWND hDlg, UINT uMsg, WPARAM wParam, LPARAM lParam)
 			//loginNameCheck = false;
 			strcpy(oldName, name);
 			GetDlgItemText(hDlg, EditName, name, NAMESIZE + 1);
+			if (!strcmp(oldName, name)) {
+				break;
+			}
 			DisplayText("%s에서 %s으로 NickName을 변경하였습니다.\n", oldName, name);
 			sprintf(buf, "%s", CHANGENAME);
-			SetEvent(hWriteEvent);					   // 쓰기 완료 알리기
-			WaitForSingleObject(hReadEvent, INFINITE); // 읽기 완료 기다리기
-
+			if (oneToOneComm == 0)
+				break;
+			else {
+				SetEvent(hWriteEvent);					   // 쓰기 완료 알리기
+				WaitForSingleObject(hReadEvent, INFINITE); // 읽기 완료 기다리기
+			}
 			break;
 
 		case IDSEND:
@@ -326,36 +332,35 @@ DWORD WINAPI Receiver(LPVOID arg)
 		}
 		// 받은 데이터 출력
 		receiveBuf[retval] = '\0';
-/*
-		if (!strcmp(receiveBuf, "]")) {
-			
-			strncpy(tempBuf2, receiveBuf, sizeof(tempBuf2));
-			char *splitChar2 = strtok(tempBuf, "/");
-			for (int i = 0; i < 1; i++)
-			{
-				splitBuf2[i] = splitChar2;
-				splitChar2 = strtok(NULL, "/");
-			}
-			if (!strcmp(splitBuf2[1], userIDString))
+
+
+		char *checkBuf = &receiveBuf[strlen(receiveBuf) - 1];
+		if (!strcmp(checkBuf, "@"))
+		{
+			receiveBuf[retval - 1] = '\0';
+			if (!strcmp(receiveBuf, userIDString))
 			{
 				oneToOneComm = 1;
+				DisplayText("같은 이름의 접속자가 이미 채팅에 존재합니다. 대화를 나눠 닉네임을 바꿔주세요\n");
 			}
-		}*/
+			continue;
+		}
 		// 닉네임 변경시 oneToOneComm 초기화
 		if (!strcmp("!@#$!@#", receiveBuf)) {
-			if (oneToOneComm == 0)
-				continue;
+			if (oneToOneComm != 0) {
+				DisplayText("일대일 대화를 종료합니다.\n");
+			}
+				
 			oneToOneComm = 0;
 			continue;
 		}
 
-		int cnt = 0;
+		int cnt = 1;
 		for (int i = 0; i < strlen(receiveBuf); i++) {
-			if (receiveBuf[i] == '/')
-			{
-				break;
+			if (receiveBuf[i] == '/') {
+				cnt++;
+				continue;
 			}
-			cnt++;
 		}
 
 		strncpy(tempBuf, receiveBuf, sizeof(tempBuf));
@@ -367,15 +372,23 @@ DWORD WINAPI Receiver(LPVOID arg)
 		}
 		strcpy(tempBuf, splitBuf[0]);
 
+		/*if (cnt == 4 && dupNameCheck == false) {
+			if (!strcmp(splitBuf[2], userIDString)) {
+				oneToOneComm = 1;
+				dupNameCheck = true;
+				continue;
+			}
+		}*/
+
 		// 1. User가 로그인했을 경우
 		if (!strcmp(LOGIN, tempBuf)) {
-			sprintf(receiveBuf, "%s%s", splitBuf[1], "채팅방에 입장하셨습니다!");
+			sprintf(receiveBuf, "닉네임 %s님이 %s", splitBuf[1], "채팅방에 입장하셨습니다!");
 			if (!strcmp(splitBuf[1], name) && strcmp(splitBuf[2], userIDString)) {
 				oneToOneComm = 1;
 
-				DisplayText("%s\n", splitBuf[2]);
+				DisplayText("같은 이름의 접속자가 채팅에 들어왔습니다. 대화를 나눠 닉네임을 바꿔주세요\n");
 				memset(buf, 0, sizeof(char) * BUFSIZE);
-				sprintf(buf, "%s/%s","]",splitBuf[2]);
+				sprintf(buf, "%s@", splitBuf[2]);
 				WaitForSingleObject(hReadEvent, INFINITE); // 읽기 완료 기다리기
 				SetEvent(hWriteEvent);					   // 쓰기 완료 알리기
 				//DisplayText("%s님이 +1 했습니다. \n", splitBuf[1]);
@@ -387,6 +400,9 @@ DWORD WINAPI Receiver(LPVOID arg)
 		// 3. 같은 Status 상태의 Client간 통신 구현
 		char status[1];
 		itoa(oneToOneComm, status, 10);
+		if (splitBuf[2] == NULL) {
+			continue;
+		}
 		if (!strcmp(splitBuf[3], status)) {
 			sprintf(receiveBuf, "[%s:%d] %s", inet_ntoa(peeraddr.sin_addr), ntohs(peeraddr.sin_port), tempBuf);
 			DisplayText("%s\n", receiveBuf);
@@ -468,7 +484,7 @@ DWORD WINAPI ClientMain(LPVOID arg)
 		if (loginNameCheck == false) {
 			loginNameCheck = true;
 
-			sprintf(sendBuf, "%s", buf);	
+			sprintf(sendBuf, "%s", buf);
 		}
 		//닉네임 바꾸기버튼 닉네임 등록하기 전엔 선택안되는 예외잡기
 		//닉네임 바꾸기버튼 닉네임 등록하기 전엔 선택안되는 예외잡기
@@ -483,7 +499,8 @@ DWORD WINAPI ClientMain(LPVOID arg)
 			timer = time(NULL);    // 현재 시각을 초 단위로 얻기
 			localtime_s(&t, &timer); // 초 단위의 시간을 분리하여 구조체에 넣기
 
-			if (buf[0] == ']') {
+			char *checkBuf = &buf[strlen(buf) - 1];
+			if (!strcmp(checkBuf, "@")) {
 				sprintf(sendBuf, buf);
 			}
 			else if (!strcmp(buf, CHANGENAME)) {
