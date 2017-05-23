@@ -50,8 +50,8 @@ char name[NAMESIZE];
 char userIDString[IDSIZE];
 int userID;
 
-int option = 0;
-bool firstIn = false;
+// 처음 로그인할 때 구분하는 변수
+bool firstLoginCheck = false;
 
 void err_quit(char *msg)
 {
@@ -236,7 +236,7 @@ BOOL CALLBACK DlgProc(HWND hDlg, UINT uMsg, WPARAM wParam, LPARAM lParam)
 			return  TRUE;
 
 		case ID_NICKCHANGE:
-			option = 0;
+			firstLoginCheck = false;
 			strcpy(oldName, name);
 			GetDlgItemText(hDlg, EditName, name, NAMESIZE + 1);
 			DisplayText("%s에서 %d으로 NickName을 변경하였습니다.\n", oldName, name);
@@ -359,12 +359,12 @@ DWORD WINAPI Receiver(LPVOID arg)
 		if (!strcmp(strArr[1], name) && strcmp(strArr[2], userIDString)) {
 		}
 
-		if (option == 0) {
+		if (firstLoginCheck == false) {
 			memset(buf, 0, sizeof(char) * BUFSIZE);
 			buf[0] = 'O';
 			WaitForSingleObject(hReadEvent, INFINITE); // 읽기 완료 기다리기
 			SetEvent(hWriteEvent);					   // 쓰기 완료 알리기
-			option++;
+			firstLoginCheck = true;
 		}
 	}
 
@@ -445,9 +445,10 @@ DWORD WINAPI ClientMain(LPVOID arg)
 		localtime_s(&t, &timer); // 초 단위의 시간을 분리하여 구조체에 넣기
 
 		char stringOption[10];
-		itoa(option, stringOption, 10);
-		sprintf(sendBuf, "[%s] %d:%d:%d : %s/%s/%s/%s", name, t.tm_mday, t.tm_hour, t.tm_min, buf, name, userIDString, stringOption);
+		//itoa(option, stringOption, 10);
+		//sprintf(sendBuf, "[%s] %d:%d:%d : %s/%s/%s/%s", name, t.tm_mday, t.tm_hour, t.tm_min, buf, name, userIDString, stringOption);
 
+		sprintf(sendBuf, "[%s] %d:%d:%d : %s/%s/%s/", name, t.tm_mday, t.tm_hour, t.tm_min, buf, name, userIDString);
 		// 데이터 보내기
 		retval = sendto(sock, sendBuf, strlen(sendBuf), 0,
 			(SOCKADDR *)&remoteaddr, sizeof(remoteaddr));
