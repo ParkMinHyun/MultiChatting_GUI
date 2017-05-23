@@ -348,7 +348,7 @@ DWORD WINAPI Receiver(LPVOID arg)
 			if (!strcmp(receiveBuf, userIDString))
 			{
 				oneToOneComm = 1;
-				DisplayText("같은 이름의 접속자가 이미 채팅에 존재합니다. 대화를 나눠 닉네임을 바꿔주세요\n");
+				DisplayText("같은 이름의 User가 이미 채팅에 존재합니다. 대화를 나눠 닉네임을 바꿔주세요.\n");
 			}
 			continue;
 		}
@@ -383,18 +383,17 @@ DWORD WINAPI Receiver(LPVOID arg)
 		if (!strcmp(LOGIN, tempBuf)) {
 			if (cnt == 3) {
 				sprintf(receiveBuf, "닉네임 %s님이 %s", splitBuf[1], "채팅방에 입장하셨습니다!");
+				DisplayText("%s\n", receiveBuf);
 			}
 			if (!strcmp(splitBuf[1], name) && strcmp(splitBuf[2], userIDString)) {
 				oneToOneComm = 1;
 
-				DisplayText("같은 이름의 접속자가 채팅에 들어왔습니다. 대화를 나눠 닉네임을 바꿔주세요\n");
+				DisplayText("같은 이름의 User가 채팅에 존재합니다. 대화를 나눠 닉네임을 바꿔주세요.\n");
 				memset(buf, 0, sizeof(char) * BUFSIZE);
 				sprintf(buf, "%s@", splitBuf[2]);
 				WaitForSingleObject(hReadEvent, INFINITE); // 읽기 완료 기다리기
 				SetEvent(hWriteEvent);					   // 쓰기 완료 알리기
 			}
-			if (cnt == 3)
-				DisplayText("%s\n", receiveBuf);
 			continue;
 		}
 
