@@ -51,6 +51,8 @@ int userID;
 
 // 처음 로그인할 때 구분하는 변수
 bool loginNameCheck = false;
+// 1:1 통신을 구분하기 위한 변수
+int oneToOneComm = 0;
 
 void err_quit(char *msg)
 {
@@ -216,6 +218,7 @@ BOOL CALLBACK DlgProc(HWND hDlg, UINT uMsg, WPARAM wParam, LPARAM lParam)
 
 		case ID_NICKCHANGE:
 			loginNameCheck = false;
+			oneToOneComm = 0;
 			strcpy(oldName, name);
 			GetDlgItemText(hDlg, EditName, name, NAMESIZE + 1);
 			DisplayText("%s에서 %d으로 NickName을 변경하였습니다.\n", oldName, name);
@@ -299,6 +302,7 @@ DWORD WINAPI Receiver(LPVOID arg)
 	int addrlen;
 	char receiveBuf[BUFSIZE + 1];
 	char tempBuf[BUFSIZE + 1];
+	char tempBuf2[BUFSIZE + 1];
 	char *splitBuf[4] = { NULL };
 	// 멀티캐스트 데이터 받기
 	while (1) {
@@ -313,34 +317,46 @@ DWORD WINAPI Receiver(LPVOID arg)
 		}
 		// 받은 데이터 출력
 		receiveBuf[retval] = '\0';
+		strcpy(tempBuf2, receiveBuf);
+
+		// 1:1 통신 수락을 요청하는 경우
+		if (!strcmp(receiveBuf, "O")) {
+			oneToOneComm = 1;
+			continue;
+		}
 
 		strncpy(tempBuf, receiveBuf, sizeof(tempBuf));
-		char *ptr = strtok(tempBuf, "/");
+		char *splitChar = strtok(tempBuf, "/");
 		for (int i = 0; i < 4; i++)
 		{
-			splitBuf[i] = ptr;
-			ptr = strtok(NULL, "/");
+			splitBuf[i] = splitChar;
+			splitChar = strtok(NULL, "/");
 		}
 		strcpy(tempBuf, splitBuf[0]);
 
-		// 1. 로그인했을 경우
+		// 1. User가 로그인했을 경우
 		if (!strcmp(LOGIN, tempBuf)) {
 			sprintf(receiveBuf, "%s%s", splitBuf[1], splitBuf[3]);
+			DisplayText("%s\n", receiveBuf);
 		}
-		else {
-			sprintf(receiveBuf, "[%s:%d] %s", inet_ntoa(peeraddr.sin_addr), ntohs(peeraddr.sin_port), tempBuf);
-		}
-		DisplayText("%s\n", receiveBuf);
 
+		// 2. 닉네임이 같은 User가 들어오면 1:1 통신 가입후 상대방도 가입하게 하기
 		if (!strcmp(splitBuf[1], name) && strcmp(splitBuf[2], userIDString)) {
-		}
+			oneToOneComm = 1;
 
-		if (loginNameCheck == false) {
 			memset(buf, 0, sizeof(char) * BUFSIZE);
 			buf[0] = 'O';
 			WaitForSingleObject(hReadEvent, INFINITE); // 읽기 완료 기다리기
 			SetEvent(hWriteEvent);					   // 쓰기 완료 알리기
-			loginNameCheck = true;
+			continue;
+		}
+
+		// 3. 1:1 통신할 경우
+		char status[1];
+		itoa(oneToOneComm, status, 10);
+		if (!strcmp(splitBuf[3], status)) {
+			sprintf(receiveBuf, "[%s:%d] %s", inet_ntoa(peeraddr.sin_addr), ntohs(peeraddr.sin_port), tempBuf);
+			DisplayText("%s\n", receiveBuf);
 		}
 	}
 
@@ -429,11 +445,12 @@ DWORD WINAPI ClientMain(LPVOID arg)
 			timer = time(NULL);    // 현재 시각을 초 단위로 얻기
 			localtime_s(&t, &timer); // 초 단위의 시간을 분리하여 구조체에 넣기
 
-			char stringOption[10];
-			//itoa(option, stringOption, 10);
-			//sprintf(sendBuf, "[%s] %d:%d:%d : %s/%s/%s/%s", name, t.tm_mday, t.tm_hour, t.tm_min, buf, name, userIDString, stringOption);
-
-			sprintf(sendBuf, "[%s] %d:%d:%d : %s/%s/%s/", name, t.tm_mday, t.tm_hour, t.tm_min, buf, name, userIDString);
+			if (!strcmp(buf, "O")) {
+				sprintf(sendBuf,buf);
+			}
+			else {
+				sprintf(sendBuf, "[%s] %d일%d시%d분 : %s/%s/%s/%d", name, t.tm_mday, t.tm_hour, t.tm_min, buf, name, userIDString, oneToOneComm);
+			}
 		}
 		// 데이터 보내기
 		retval = sendto(sock, sendBuf, strlen(sendBuf), 0,
