@@ -8,11 +8,10 @@
 #include <stdio.h>
 #include "resource.h"
 
-#define MULTICASTIP "235.7.8.10"
-#define REMOTEPORT 9000
-#define BUFSIZE    512
+#define BUFSIZE  512
 #define NAMESIZE 10
 #define IDSIZE 10
+#define LOGIN "!@#*@#!"
 
 char *multicastIP;
 char *multicastPort;
@@ -207,32 +206,12 @@ BOOL CALLBACK DlgProc(HWND hDlg, UINT uMsg, WPARAM wParam, LPARAM lParam)
 			SetEvent(hLoginWriteEvent);					   // 쓰기 완료 알리기
 			SetFocus(hEditText);
 
-			// User Name이랑 ID 보내기
-			//sprintf(buf, "!%s!%s", name, userIDString);
+			// Login에 대한 Buf 내용 전송
+			LoginCheck = true;
+			sprintf(buf, "%s/%s/%s/%s/", LOGIN, name, userIDString, "님이 채팅방에 접속했습니다.");
 			SetEvent(hWriteEvent);					   // 쓰기 완료 알리기
 			WaitForSingleObject(hReadEvent, INFINITE); // 읽기 완료 기다리기
-			GetDlgItemText(hDlg, EditName, buf, BUFSIZE + 1);
-			LoginCheck = true;
-			//if (twiceCheck == true) {
-			//	int retval;
-			//	// 멀티캐스트 그룹 탈퇴
-			//    retval = setsockopt(receiveSock, IPPROTO_IP, IP_DROP_MEMBERSHIP,
-			//		(char *)&mreq, sizeof(mreq));
-			//	if (retval == SOCKET_ERROR) err_quit("setsockopt()");
-			//	// 소켓 주소 구조체 초기화
-			//	ZeroMemory(&remoteaddr, sizeof(remoteaddr));
-			//	remoteaddr.sin_family = AF_INET;
-			//	remoteaddr.sin_addr.s_addr = inet_addr("235.7.8.9");
-			//	remoteaddr.sin_port = htons(atoi(multicastPort));
-			//	// 멀티캐스트 그룹 가입
-			//	mreq.imr_multiaddr.s_addr = inet_addr("235.7.8.9");
-			//	mreq.imr_interface.s_addr = htonl(INADDR_ANY);
-			//	retval = setsockopt(receiveSock, IPPROTO_IP, IP_ADD_MEMBERSHIP,
-			//		(char *)&mreq, sizeof(mreq));
-			//	if (retval == SOCKET_ERROR) err_quit("setsockopt()");
-			//	twiceCheck = false;
-			//}
-			//twiceCheck = true;
+
 			return  TRUE;
 
 		case ID_NICKCHANGE:
@@ -336,7 +315,6 @@ DWORD WINAPI Receiver(LPVOID arg)
 		receiveBuf[retval] = '\0';
 
 		strncpy(tempBuf, receiveBuf, sizeof(tempBuf));
-
 		char *ptr = strtok(tempBuf, "/");
 		for (int i = 0; i < 4; i++)
 		{
@@ -344,16 +322,15 @@ DWORD WINAPI Receiver(LPVOID arg)
 			ptr = strtok(NULL, "/");
 		}
 		strcpy(tempBuf, splitBuf[0]);
-		sprintf(receiveBuf, "[%s:%d] %s", inet_ntoa(peeraddr.sin_addr), ntohs(peeraddr.sin_port), tempBuf);
 
+		// 1. 로그인했을 경우
+		if (!strcmp(LOGIN, tempBuf)) {
+			sprintf(receiveBuf, "%s%s", splitBuf[1], splitBuf[3]);
+		}
+		else {
+			sprintf(receiveBuf, "[%s:%d] %s", inet_ntoa(peeraddr.sin_addr), ntohs(peeraddr.sin_port), tempBuf);
+		}
 		DisplayText("%s\n", receiveBuf);
-		/*
-		char optionChar[10];
-		itoa(option, optionChar, 10);
-		if (!strcmp(strArr[3], optionChar)) {
-			DisplayText("%s\n", receiveBuf);
-		}*/
-		//자기 OP랑 같으면 Display에 쏴주기
 
 		if (!strcmp(splitBuf[1], name) && strcmp(splitBuf[2], userIDString)) {
 		}
@@ -418,7 +395,8 @@ DWORD WINAPI ClientMain(LPVOID arg)
 	// 데이터 통신에 사용할 변수
 	int len;
 	char sendBuf[BUFSIZE + 1];
-	char receiveBuf[BUFSIZE + 1];
+	char tempBuf[BUFSIZE + 1];
+	char splitSendBuf[4] = { NULL };
 	HANDLE hThread;
 
 	//리시버 스레드 생성
@@ -431,23 +409,32 @@ DWORD WINAPI ClientMain(LPVOID arg)
 	while (1) {
 		// 쓰기 완료 기다리기
 		WaitForSingleObject(hWriteEvent, INFINITE);
-		//// 문자열 길이가 0이면 보내지 않음
-		//if (strlen(buf) == 0) {
-		//	SetEvent(hReadEvent); // 읽기 완료 알리기
-		//	continue;
-		//}
-		struct tm t;
-		time_t timer;
-		//235.7.8.10
+		// 문자열 길이가 0이면 보내지 않음
+		if (strlen(buf) == 0) {
+			SetEvent(hReadEvent); // 읽기 완료 알리기
+			continue;
+		}
 
-		timer = time(NULL);    // 현재 시각을 초 단위로 얻기
-		localtime_s(&t, &timer); // 초 단위의 시간을 분리하여 구조체에 넣기
+		// Login에 대한 Data 전송일 경우
+		if (loginNameCheck == false) {
+			loginNameCheck = true;
 
-		char stringOption[10];
-		//itoa(option, stringOption, 10);
-		//sprintf(sendBuf, "[%s] %d:%d:%d : %s/%s/%s/%s", name, t.tm_mday, t.tm_hour, t.tm_min, buf, name, userIDString, stringOption);
+			sprintf(sendBuf, "%s", buf);
+		}
+		else {
+			struct tm t;
+			time_t timer;
+			//235.7.8.10
 
-		sprintf(sendBuf, "[%s] %d:%d:%d : %s/%s/%s/", name, t.tm_mday, t.tm_hour, t.tm_min, buf, name, userIDString);
+			timer = time(NULL);    // 현재 시각을 초 단위로 얻기
+			localtime_s(&t, &timer); // 초 단위의 시간을 분리하여 구조체에 넣기
+
+			char stringOption[10];
+			//itoa(option, stringOption, 10);
+			//sprintf(sendBuf, "[%s] %d:%d:%d : %s/%s/%s/%s", name, t.tm_mday, t.tm_hour, t.tm_min, buf, name, userIDString, stringOption);
+
+			sprintf(sendBuf, "[%s] %d:%d:%d : %s/%s/%s/", name, t.tm_mday, t.tm_hour, t.tm_min, buf, name, userIDString);
+		}
 		// 데이터 보내기
 		retval = sendto(sock, sendBuf, strlen(sendBuf), 0,
 			(SOCKADDR *)&remoteaddr, sizeof(remoteaddr));
@@ -456,7 +443,6 @@ DWORD WINAPI ClientMain(LPVOID arg)
 			continue;
 		}
 		SetEvent(hReadEvent);			 // 읽기 완료 알리기
-
 	}
 
 	return 0;
