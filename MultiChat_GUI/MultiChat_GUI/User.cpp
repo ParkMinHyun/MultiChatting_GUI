@@ -51,7 +51,7 @@ char userIDString[IDSIZE];
 int userID;
 
 // 처음 로그인할 때 구분하는 변수
-bool firstLoginCheck = false;
+bool loginNameCheck = false;
 
 void err_quit(char *msg)
 {
@@ -236,7 +236,7 @@ BOOL CALLBACK DlgProc(HWND hDlg, UINT uMsg, WPARAM wParam, LPARAM lParam)
 			return  TRUE;
 
 		case ID_NICKCHANGE:
-			firstLoginCheck = false;
+			loginNameCheck = false;
 			strcpy(oldName, name);
 			GetDlgItemText(hDlg, EditName, name, NAMESIZE + 1);
 			DisplayText("%s에서 %d으로 NickName을 변경하였습니다.\n", oldName, name);
@@ -320,8 +320,7 @@ DWORD WINAPI Receiver(LPVOID arg)
 	int addrlen;
 	char receiveBuf[BUFSIZE + 1];
 	char tempBuf[BUFSIZE + 1];
-	char tempBuf2[BUFSIZE + 1];
-	char *strArr[4] = { NULL };
+	char *splitBuf[4] = { NULL };
 	// 멀티캐스트 데이터 받기
 	while (1) {
 		// 데이터 받기
@@ -341,10 +340,10 @@ DWORD WINAPI Receiver(LPVOID arg)
 		char *ptr = strtok(tempBuf, "/");
 		for (int i = 0; i < 4; i++)
 		{
-			strArr[i] = ptr;
+			splitBuf[i] = ptr;
 			ptr = strtok(NULL, "/");
 		}
-		strcpy(tempBuf, strArr[0]);
+		strcpy(tempBuf, splitBuf[0]);
 		sprintf(receiveBuf, "[%s:%d] %s", inet_ntoa(peeraddr.sin_addr), ntohs(peeraddr.sin_port), tempBuf);
 
 		DisplayText("%s\n", receiveBuf);
@@ -356,15 +355,15 @@ DWORD WINAPI Receiver(LPVOID arg)
 		}*/
 		//자기 OP랑 같으면 Display에 쏴주기
 
-		if (!strcmp(strArr[1], name) && strcmp(strArr[2], userIDString)) {
+		if (!strcmp(splitBuf[1], name) && strcmp(splitBuf[2], userIDString)) {
 		}
 
-		if (firstLoginCheck == false) {
+		if (loginNameCheck == false) {
 			memset(buf, 0, sizeof(char) * BUFSIZE);
 			buf[0] = 'O';
 			WaitForSingleObject(hReadEvent, INFINITE); // 읽기 완료 기다리기
 			SetEvent(hWriteEvent);					   // 쓰기 완료 알리기
-			firstLoginCheck = true;
+			loginNameCheck = true;
 		}
 	}
 
