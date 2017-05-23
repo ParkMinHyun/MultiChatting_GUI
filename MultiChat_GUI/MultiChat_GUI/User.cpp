@@ -184,12 +184,6 @@ BOOL CALLBACK DlgProc(HWND hDlg, UINT uMsg, WPARAM wParam, LPARAM lParam)
 			portCheck = true;
 			return TRUE;
 
-		case IDNICKNAME:
-			GetDlgItemText(hDlg, EditName, name, NAMESIZE + 1);
-			nameCheck = true;
-			EnableWindow(hResisterNick, FALSE); //접속 컨트롤 비활성화
-			registerNameCheck = true;
-			return TRUE;
 
 		case IDOK:
 			if (ipCheck == false || portCheck == false) {
@@ -218,29 +212,39 @@ BOOL CALLBACK DlgProc(HWND hDlg, UINT uMsg, WPARAM wParam, LPARAM lParam)
 
 			return  TRUE;
 
-		case ID_NICKCHANGE:
+		case IDNICKNAME:
+			GetDlgItemText(hDlg, EditName, name, NAMESIZE + 1);
+			nameCheck = true;
+			EnableWindow(hResisterNick, FALSE); //접속 컨트롤 비활성화
+			registerNameCheck = true;
+			return TRUE;
 
+		case ID_NICKCHANGE:
+			// Name을 등록하기전에 누르면 허용X
 			if (registerNameCheck == false)
 				break;
 
 			strcpy(oldName, name);
 			GetDlgItemText(hDlg, EditName, name, NAMESIZE + 1);
+			// 이전과 같은 이름이면 허용X
 			if (!strcmp(oldName, name)) {
 				break;
 			}
 
-			timer = time(NULL);    // 현재 시각을 초 단위로 얻기
+			timer = time(NULL);      // 현재 시각을 초 단위로 얻기
 			localtime_s(&t, &timer); // 초 단위의 시간을 분리하여 구조체에 넣기
 
 			DisplayText("(%d일 %d시 %d분) %s에서 %s으로 NickName을 변경하였습니다.\n",
 				t.tm_mday, t.tm_hour, t.tm_min, oldName, name );
-			sprintf(buf, "%s", CHANGENAME);
-			if (oneToOneComm == 0)
-				break;
-			else {
-				SetEvent(hWriteEvent);					   // 쓰기 완료 알리기
-				WaitForSingleObject(hReadEvent, INFINITE); // 읽기 완료 기다리기
+
+			if (oneToOneComm == 1){
+				sprintf(buf, "%s", CHANGENAME);
 			}
+			else {
+				sprintf(buf, "%s/%s/%s", LOGIN, name, userIDString);
+			}
+			SetEvent(hWriteEvent);					   // 쓰기 완료 알리기
+			WaitForSingleObject(hReadEvent, INFINITE); // 읽기 완료 기다리기
 			break;
 
 		case IDSEND:
@@ -321,7 +325,7 @@ DWORD WINAPI Receiver(LPVOID arg)
 	int addrlen;
 	char receiveBuf[BUFSIZE + 1];
 	char tempBuf[BUFSIZE + 1];
-	char *splitBuf[4] = { NULL };
+	char *splitBuf[5] = { NULL };
 	// 멀티캐스트 데이터 받기
 	while (1) {
 		// 데이터 받기
