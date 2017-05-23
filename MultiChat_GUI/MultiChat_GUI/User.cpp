@@ -12,6 +12,7 @@
 #define NAMESIZE 10
 #define IDSIZE 10
 #define LOGIN "!@#*@#!"
+#define CHANGENAME "!@#$!@#%"
 
 char *multicastIP;
 char *multicastPort;
@@ -51,6 +52,8 @@ int userID;
 
 // 처음 로그인할 때 구분하는 변수
 bool loginNameCheck = false;
+// 중복 닉네임 검출
+bool dupNameCheck = false;
 // 1:1 통신을 구분하기 위한 변수
 int oneToOneComm = 0;
 
@@ -217,11 +220,14 @@ BOOL CALLBACK DlgProc(HWND hDlg, UINT uMsg, WPARAM wParam, LPARAM lParam)
 			return  TRUE;
 
 		case ID_NICKCHANGE:
-			loginNameCheck = false;
-			oneToOneComm = 0;
+			//loginNameCheck = false;
 			strcpy(oldName, name);
 			GetDlgItemText(hDlg, EditName, name, NAMESIZE + 1);
-			DisplayText("%s에서 %d으로 NickName을 변경하였습니다.\n", oldName, name);
+			DisplayText("%s에서 %s으로 NickName을 변경하였습니다.\n", oldName, name);
+			sprintf(buf, "%s", CHANGENAME);
+			SetEvent(hWriteEvent);					   // 쓰기 완료 알리기
+			WaitForSingleObject(hReadEvent, INFINITE); // 읽기 완료 기다리기
+
 			break;
 
 		case IDSEND:
@@ -304,6 +310,7 @@ DWORD WINAPI Receiver(LPVOID arg)
 	char tempBuf[BUFSIZE + 1];
 	char tempBuf2[BUFSIZE + 1];
 	char *splitBuf[4] = { NULL };
+	char *splitBuf2[3] = { NULL };
 	// 멀티캐스트 데이터 받기
 	while (1) {
 		// 데이터 받기
@@ -317,11 +324,19 @@ DWORD WINAPI Receiver(LPVOID arg)
 		}
 		// 받은 데이터 출력
 		receiveBuf[retval] = '\0';
-		strcpy(tempBuf2, receiveBuf);
+
 
 		// 1:1 통신 수락을 요청하는 경우
-		if (!strcmp(receiveBuf, "O")) {
+		if (receiveBuf[0] == 'O') {
 			oneToOneComm = 1;
+			//DisplayText("%s님이 +1 했습니다. \n", splitBuf[1]);
+			continue;
+
+		}
+
+		// 닉네임 변경시 oneToOneComm 초기화
+		if (!strcmp("!@#$!@#", receiveBuf)) {
+			oneToOneComm = 0;
 			continue;
 		}
 
@@ -340,23 +355,26 @@ DWORD WINAPI Receiver(LPVOID arg)
 			DisplayText("%s\n", receiveBuf);
 		}
 
+		//235.7.8.10
 		// 2. 닉네임이 같은 User가 들어오면 1:1 통신 가입후 상대방도 가입하게 하기
 		if (!strcmp(splitBuf[1], name) && strcmp(splitBuf[2], userIDString)) {
 			oneToOneComm = 1;
+			//DisplayText("%s님이 +1 했습니다. \n", splitBuf[1]); 
 
 			memset(buf, 0, sizeof(char) * BUFSIZE);
-			buf[0] = 'O';
+			sprintf(buf, "O");
 			WaitForSingleObject(hReadEvent, INFINITE); // 읽기 완료 기다리기
 			SetEvent(hWriteEvent);					   // 쓰기 완료 알리기
 			continue;
 		}
 
-		// 3. 1:1 통신할 경우
+		// 3. 같은 Status 상태의 Client간 통신 구현
 		char status[1];
 		itoa(oneToOneComm, status, 10);
 		if (!strcmp(splitBuf[3], status)) {
 			sprintf(receiveBuf, "[%s:%d] %s", inet_ntoa(peeraddr.sin_addr), ntohs(peeraddr.sin_port), tempBuf);
 			DisplayText("%s\n", receiveBuf);
+			//DisplayText("%s : %s\n", receiveBuf, status);
 		}
 	}
 
@@ -446,7 +464,10 @@ DWORD WINAPI ClientMain(LPVOID arg)
 			localtime_s(&t, &timer); // 초 단위의 시간을 분리하여 구조체에 넣기
 
 			if (!strcmp(buf, "O")) {
-				sprintf(sendBuf,buf);
+				sprintf(sendBuf, buf);
+			}
+			else if (!strcmp(buf, CHANGENAME)) {
+				sprintf(sendBuf, buf);
 			}
 			else {
 				sprintf(sendBuf, "[%s] %d일%d시%d분 : %s/%s/%s/%d", name, t.tm_mday, t.tm_hour, t.tm_min, buf, name, userIDString, oneToOneComm);
