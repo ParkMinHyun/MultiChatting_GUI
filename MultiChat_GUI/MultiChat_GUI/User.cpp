@@ -203,6 +203,7 @@ BOOL CALLBACK DlgProc(HWND hDlg, UINT uMsg, WPARAM wParam, LPARAM lParam)
 				SetFocus(hEditName);
 				return TRUE;
 			}
+			DisplayText("%s\n", userIDString);
 			EnableWindow(hLoginButton, FALSE); //접속 컨트롤 비활성화
 			WaitForSingleObject(hLoginReadEvent, INFINITE); // 읽기 완료 기다리기
 
@@ -213,7 +214,8 @@ BOOL CALLBACK DlgProc(HWND hDlg, UINT uMsg, WPARAM wParam, LPARAM lParam)
 
 			// Login에 대한 Buf 내용 전송
 			LoginCheck = true;
-			sprintf(buf, "%s/%s/%s/%s/", LOGIN, name, userIDString, "님이 채팅방에 접속했습니다.");
+			sprintf(buf, "%s/%s/%s", LOGIN, name, userIDString);
+			//sprintf(buf, "%s/%s/%s/%s/", LOGIN, name, userIDString, "님이 채팅방에 접속했습니다.");
 			SetEvent(hWriteEvent);					   // 쓰기 완료 알리기
 			WaitForSingleObject(hReadEvent, INFINITE); // 읽기 완료 기다리기
 
@@ -324,25 +326,41 @@ DWORD WINAPI Receiver(LPVOID arg)
 		}
 		// 받은 데이터 출력
 		receiveBuf[retval] = '\0';
-
-
-		// 1:1 통신 수락을 요청하는 경우
-		if (receiveBuf[0] == 'O') {
-			oneToOneComm = 1;
-			//DisplayText("%s님이 +1 했습니다. \n", splitBuf[1]);
-			continue;
-
-		}
-
+/*
+		if (!strcmp(receiveBuf, "]")) {
+			
+			strncpy(tempBuf2, receiveBuf, sizeof(tempBuf2));
+			char *splitChar2 = strtok(tempBuf, "/");
+			for (int i = 0; i < 1; i++)
+			{
+				splitBuf2[i] = splitChar2;
+				splitChar2 = strtok(NULL, "/");
+			}
+			if (!strcmp(splitBuf2[1], userIDString))
+			{
+				oneToOneComm = 1;
+			}
+		}*/
 		// 닉네임 변경시 oneToOneComm 초기화
 		if (!strcmp("!@#$!@#", receiveBuf)) {
+			if (oneToOneComm == 0)
+				continue;
 			oneToOneComm = 0;
 			continue;
 		}
 
+		int cnt = 0;
+		for (int i = 0; i < strlen(receiveBuf); i++) {
+			if (receiveBuf[i] == '/')
+			{
+				break;
+			}
+			cnt++;
+		}
+
 		strncpy(tempBuf, receiveBuf, sizeof(tempBuf));
 		char *splitChar = strtok(tempBuf, "/");
-		for (int i = 0; i < 4; i++)
+		for (int i = 0; i < cnt; i++)
 		{
 			splitBuf[i] = splitChar;
 			splitChar = strtok(NULL, "/");
@@ -351,20 +369,18 @@ DWORD WINAPI Receiver(LPVOID arg)
 
 		// 1. User가 로그인했을 경우
 		if (!strcmp(LOGIN, tempBuf)) {
-			sprintf(receiveBuf, "%s%s", splitBuf[1], splitBuf[3]);
+			sprintf(receiveBuf, "%s%s", splitBuf[1], "채팅방에 입장하셨습니다!");
+			if (!strcmp(splitBuf[1], name) && strcmp(splitBuf[2], userIDString)) {
+				oneToOneComm = 1;
+
+				DisplayText("%s\n", splitBuf[2]);
+				memset(buf, 0, sizeof(char) * BUFSIZE);
+				sprintf(buf, "%s/%s","]",splitBuf[2]);
+				WaitForSingleObject(hReadEvent, INFINITE); // 읽기 완료 기다리기
+				SetEvent(hWriteEvent);					   // 쓰기 완료 알리기
+				//DisplayText("%s님이 +1 했습니다. \n", splitBuf[1]);
+			}
 			DisplayText("%s\n", receiveBuf);
-		}
-
-		//235.7.8.10
-		// 2. 닉네임이 같은 User가 들어오면 1:1 통신 가입후 상대방도 가입하게 하기
-		if (!strcmp(splitBuf[1], name) && strcmp(splitBuf[2], userIDString)) {
-			oneToOneComm = 1;
-			//DisplayText("%s님이 +1 했습니다. \n", splitBuf[1]); 
-
-			memset(buf, 0, sizeof(char) * BUFSIZE);
-			sprintf(buf, "O");
-			WaitForSingleObject(hReadEvent, INFINITE); // 읽기 완료 기다리기
-			SetEvent(hWriteEvent);					   // 쓰기 완료 알리기
 			continue;
 		}
 
@@ -430,7 +446,6 @@ DWORD WINAPI ClientMain(LPVOID arg)
 	int len;
 	char sendBuf[BUFSIZE + 1];
 	char tempBuf[BUFSIZE + 1];
-	char splitSendBuf[4] = { NULL };
 	HANDLE hThread;
 
 	//리시버 스레드 생성
@@ -453,8 +468,13 @@ DWORD WINAPI ClientMain(LPVOID arg)
 		if (loginNameCheck == false) {
 			loginNameCheck = true;
 
-			sprintf(sendBuf, "%s", buf);
+			sprintf(sendBuf, "%s", buf);	
 		}
+		//닉네임 바꾸기버튼 닉네임 등록하기 전엔 선택안되는 예외잡기
+		//닉네임 바꾸기버튼 닉네임 등록하기 전엔 선택안되는 예외잡기
+		//닉네임 바꾸기버튼 닉네임 등록하기 전엔 선택안되는 예외잡기
+		//닉네임 바꾸기버튼 닉네임 등록하기 전엔 선택안되는 예외잡기
+		//닉네임 채인지 예외도
 		else {
 			struct tm t;
 			time_t timer;
@@ -463,7 +483,7 @@ DWORD WINAPI ClientMain(LPVOID arg)
 			timer = time(NULL);    // 현재 시각을 초 단위로 얻기
 			localtime_s(&t, &timer); // 초 단위의 시간을 분리하여 구조체에 넣기
 
-			if (!strcmp(buf, "O")) {
+			if (buf[0] == ']') {
 				sprintf(sendBuf, buf);
 			}
 			else if (!strcmp(buf, CHANGENAME)) {
