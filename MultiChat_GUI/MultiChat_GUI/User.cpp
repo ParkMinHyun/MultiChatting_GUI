@@ -242,6 +242,11 @@ BOOL CALLBACK DlgProc(HWND hDlg, UINT uMsg, WPARAM wParam, LPARAM lParam)
 
 			if (oneToOneComm == 1) {
 				sprintf(buf, "%s", CHANGENAME);
+				SetEvent(hWriteEvent);					   // 쓰기 완료 알리기
+				WaitForSingleObject(hReadEvent, INFINITE); // 읽기 완료 기다리기
+
+				Sleep(100);
+				sprintf(buf, "%s/%s/%s/", LOGIN, name, userIDString);
 			}
 			else {
 				sprintf(buf, "%s/%s/%s/", LOGIN, name, userIDString);
@@ -492,7 +497,6 @@ DWORD WINAPI ClientMain(LPVOID arg)
 			sprintf(sendBuf, "%s", buf);
 		}
 		else {
-
 			timer = time(NULL);    // 현재 시각을 초 단위로 얻기
 			localtime_s(&t, &timer); // 초 단위의 시간을 분리하여 구조체에 넣기
 
