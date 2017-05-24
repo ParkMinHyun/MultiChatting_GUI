@@ -1,3 +1,6 @@
+// 2017년 1학기 네트워크프로그래밍 숙제 2번
+// 성명: 박민현 학번: 122179
+
 #pragma comment(lib, "ws2_32")
 #include <winsock2.h>
 #include <ws2tcpip.h>
@@ -404,6 +407,10 @@ DWORD WINAPI Receiver(LPVOID arg)
 			continue;
 		}
 		if (!strcmp(splitBuf[3], status)) {
+			sprintf(receiveBuf, "[%s:%d] %s", inet_ntoa(peeraddr.sin_addr), ntohs(peeraddr.sin_port), tempBuf);
+			DisplayText("%s\n", receiveBuf);
+		}
+		else if (!strcmp(splitBuf[3], "0")) {
 			sprintf(receiveBuf, "[%s:%d] %s", inet_ntoa(peeraddr.sin_addr), ntohs(peeraddr.sin_port), tempBuf);
 			DisplayText("%s\n", receiveBuf);
 		}
